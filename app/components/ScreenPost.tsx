@@ -2,6 +2,7 @@
 import React from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel } from './shared';
+import { useHousehold } from './HouseholdSwitcher';
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -32,6 +33,8 @@ export function ScreenPost({ onCancel, onPost }: {
   onCancel?: () => void;
   onPost?: () => void;
 }) {
+  const { active, all } = useHousehold();
+  const multi = all.length > 1;
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
@@ -49,6 +52,26 @@ export function ScreenPost({ onCancel, onPost }: {
       />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px 120px' }}>
+        {multi && active && (
+          <div style={{
+            marginTop: 4, padding: '10px 12px',
+            background: G.paper, border: `1px solid ${G.hairline2}`,
+            borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{ fontSize: 20 }}>{active.glyph}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: G.sans, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, fontWeight: 700 }}>
+                Posting to
+              </div>
+              <div style={{ fontFamily: G.display, fontSize: 14, color: G.ink, fontWeight: 500 }}>
+                {active.name}
+              </div>
+            </div>
+            <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 11, color: G.muted }}>
+              switch in masthead
+            </div>
+          </div>
+        )}
         <Field label="For" value="Maya & Theo" />
 
         <div style={{ marginTop: 22 }}>

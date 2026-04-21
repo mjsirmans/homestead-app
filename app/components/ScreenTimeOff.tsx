@@ -2,6 +2,7 @@
 import React from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel } from './shared';
+import { HouseholdSwitcher } from './HouseholdSwitcher';
 
 function SectionHead2({ label }: { label: string }) {
   return (
@@ -66,7 +67,7 @@ export function ScreenTimeOff() {
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
-        left="Your Availability" right="Open by default"
+        leftAction={<HouseholdSwitcher />} right="Your availability"
         title="Time Off"
         tagline="You're available by default. Block out the times you can't help — family keeps seeing everything else."
         folioLeft="No. 142" folioRight="Homestead Press"

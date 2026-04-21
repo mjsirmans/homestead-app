@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel, GAvatar, GHead } from './shared';
+import { HouseholdSwitcher } from './HouseholdSwitcher';
 
 type VillageGroup = 'inner' | 'family' | 'sitter';
 type AppRole = 'parent' | 'caregiver';
@@ -292,8 +293,8 @@ export function ScreenVillage() {
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
-        left={total === 0 ? 'empty' : `${total} people`}
-        right="+ invite"
+        leftAction={<HouseholdSwitcher />}
+        right={total === 0 ? 'empty · + invite' : `${total} people · + invite`}
         title="The Village"
         tagline="Grouped by how close they are when the call goes out."
         folioLeft="No. 142" folioRight="Homestead Press"

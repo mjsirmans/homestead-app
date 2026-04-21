@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel, GAvatar } from './shared';
+import { HouseholdSwitcher } from './HouseholdSwitcher';
 
 function AlmanacRow({ date, time, who, what, status, tone }: {
   date?: string; time: string; who: string; what: string;
@@ -192,7 +193,7 @@ export function ScreenAlmanac({ role = 'parent' }: { role?: 'parent' | 'caregive
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
-        left="Thursday · Oct 17" right="October 2025"
+        leftAction={<HouseholdSwitcher />} right="October 2025"
         title={isCg ? 'My Schedule' : 'The Almanac'}
         tagline={
           isCg

@@ -2,6 +2,7 @@
 import React from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel, GAvatar, SectionHead } from './shared';
+import { HouseholdSwitcher } from './HouseholdSwitcher';
 
 function LedgerRow({ when, dur, title, who, kind, compact }: {
   when: string; dur?: string; title: string; who: string;
@@ -39,7 +40,7 @@ function CaregiverHome() {
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
-        left="Thursday · Oct 17" right="Vol. IV"
+        leftAction={<HouseholdSwitcher />} right="Thu · Oct 17"
         title="Ruth's Week"
         tagline="Two shifts claimed. One invitation waiting for you."
         folioLeft="No. 142" folioRight="Homestead Press"
@@ -153,7 +154,7 @@ export function ScreenHome({ onRing, role = 'parent' }: {
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
-        left="Thursday · Oct 17" right="Vol. IV"
+        leftAction={<HouseholdSwitcher />} right="Thu · Oct 17"
         title="The Homestead"
         tagline="Two shifts on the books. One still uncovered for Saturday."
         folioLeft="No. 142" folioRight="Homestead Press"

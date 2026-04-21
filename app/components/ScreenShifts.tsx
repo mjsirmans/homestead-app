@@ -2,6 +2,7 @@
 import React from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel } from './shared';
+import { HouseholdSwitcher } from './HouseholdSwitcher';
 
 const shifts = [
   { when: 'Tonight', dayLarge: '17', month: 'OCT', dow: 'Thu', time: '5:30 – 8:00 PM', dur: '2.5h', family: 'The Parks', title: 'Pickup + dinner', note: "Maya (7) & Theo (4). Pasta's in the fridge.", pay: '$18/hr', fresh: false },
@@ -63,7 +64,7 @@ export function ScreenShifts() {
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
-        left="Thursday · Oct 17" right="4 open"
+        leftAction={<HouseholdSwitcher />} right="4 open"
         title="Open Shifts"
         tagline="From three families in your village. Claim one to lock it in."
         folioLeft="No. 142" folioRight="The Slate"

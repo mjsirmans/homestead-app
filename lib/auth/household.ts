@@ -1,5 +1,5 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { households, users } from '@/lib/db/schema';
 
@@ -19,7 +19,10 @@ export async function requireHousehold() {
     }).returning();
   }
 
-  let [user] = await db.select().from(users).where(eq(users.clerkUserId, userId)).limit(1);
+  let [user] = await db.select().from(users).where(and(
+    eq(users.clerkUserId, userId),
+    eq(users.householdId, household.id),
+  )).limit(1);
   if (!user) {
     const clerkUser = await client.users.getUser(userId);
     const email = clerkUser.primaryEmailAddress?.emailAddress ?? '';

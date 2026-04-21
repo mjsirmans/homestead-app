@@ -9,6 +9,7 @@ import { ScreenAlmanac } from './ScreenAlmanac';
 import { ScreenBell } from './ScreenBell';
 import { ScreenTimeOff } from './ScreenTimeOff';
 import { ScreenVillage } from './ScreenVillage';
+import { HouseholdProvider } from './HouseholdSwitcher';
 
 type TabId = 'home' | 'almanac' | 'post' | 'bell' | 'village' | 'shifts' | 'timeoff';
 type Role = 'parent' | 'caregiver';
@@ -201,28 +202,31 @@ export function HomesteadApp() {
   // ── MOBILE LAYOUT ────────────────────────────────────────────────────────
   if (isMobile) {
     return (
-      <div style={{
-        position: 'fixed', inset: 0,
-        background: G.bg, color: G.ink,
-        fontFamily: G.sans,
-        display: 'flex', flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
-        <RoleSwitcherMobile role={role} onChange={handleRoleChange} />
+      <HouseholdProvider>
         <div style={{
-          flex: 1, overflow: 'hidden', position: 'relative',
-          paddingTop: 'env(safe-area-inset-top, 0px)',
+          position: 'fixed', inset: 0,
+          background: G.bg, color: G.ink,
+          fontFamily: G.sans,
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
         }}>
-          {renderScreen()}
+          <RoleSwitcherMobile role={role} onChange={handleRoleChange} />
+          <div style={{
+            flex: 1, overflow: 'hidden', position: 'relative',
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+          }}>
+            {renderScreen()}
+          </div>
+          <GTabBar active={currentTab} onNavigate={navigate} role={role} />
+          {toast && <Toast key={toast.key} msg={toast.msg} onDone={() => setToast(null)} />}
         </div>
-        <GTabBar active={currentTab} onNavigate={navigate} role={role} />
-        {toast && <Toast key={toast.key} msg={toast.msg} onDone={() => setToast(null)} />}
-      </div>
+      </HouseholdProvider>
     );
   }
 
   // ── DESKTOP LAYOUT (phone frame) ─────────────────────────────────────────
   return (
+    <HouseholdProvider>
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: '#1a120b', gap: 32, padding: '24px 16px', flexWrap: 'wrap',
@@ -305,5 +309,6 @@ export function HomesteadApp() {
         </div>
       </div>
     </div>
+    </HouseholdProvider>
   );
 }
