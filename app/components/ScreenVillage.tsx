@@ -54,12 +54,18 @@ function GroupHeader({ count, label, note }: { count: number; label: string; not
   );
 }
 
-function MemberCard({ name, role, isMe, appRole, onToggleRole, onDelete, photoUrl, targetType, targetId, onPhotoChange }: {
+const GROUP_CYCLE: VillageGroup[] = ['inner', 'family', 'sitter'];
+const GROUP_LABEL: Record<VillageGroup, string> = { inner: 'IC', family: 'FC', sitter: 'TS' };
+const GROUP_TITLE: Record<VillageGroup, string> = { inner: 'Inner Circle', family: 'Family & Close', sitter: 'Trusted Sitter' };
+
+function MemberCard({ name, role, isMe, appRole, onToggleRole, villageGroup, onChangeGroup, onDelete, photoUrl, targetType, targetId, onPhotoChange }: {
   name: string;
   role: string;
   isMe?: boolean;
   appRole?: AppRole;
   onToggleRole?: () => void;
+  villageGroup?: VillageGroup;
+  onChangeGroup?: (g: VillageGroup) => void;
   onDelete?: () => void;
   photoUrl?: string | null;
   targetType?: 'user' | 'kid';
@@ -139,6 +145,22 @@ function MemberCard({ name, role, isMe, appRole, onToggleRole, onDelete, photoUr
           </div>
           <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 10.5, color: G.muted, marginTop: 2, lineHeight: 1.3 }}>{role}</div>
         </div>
+        {villageGroup && onChangeGroup && (
+          <button
+            onClick={() => {
+              const next = GROUP_CYCLE[(GROUP_CYCLE.indexOf(villageGroup) + 1) % GROUP_CYCLE.length];
+              onChangeGroup(next);
+            }}
+            title={`Circle: ${GROUP_TITLE[villageGroup]} — tap to change`}
+            style={{
+              background: 'transparent', color: G.muted,
+              border: `1px solid ${G.hairline2}`, borderRadius: 100,
+              padding: '3px 7px', cursor: 'pointer',
+              fontFamily: G.sans, fontSize: 8, fontWeight: 700, letterSpacing: 0.8,
+              textTransform: 'uppercase', flexShrink: 0,
+            }}
+          >{GROUP_LABEL[villageGroup]}</button>
+        )}
         {onToggleRole && appRole && (
           <button onClick={onToggleRole} title="Toggle role" style={{
             background: appRole === 'parent' ? G.ink : 'transparent',
@@ -582,6 +604,18 @@ export function ScreenVillage() {
     }
     load();
   };
+  const changeGroup = async (id: string, villageGroup: VillageGroup) => {
+    const res = await fetch(`/api/household/members/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ villageGroup }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'Failed to move circle');
+    }
+    load();
+  };
   const removeKid = async (id: string) => {
     await fetch(`/api/village?type=kid&id=${id}`, { method: 'DELETE' });
     load();
@@ -658,6 +692,8 @@ export function ScreenVillage() {
                               isMe={isMe}
                               appRole={canManage ? m.role : undefined}
                               onToggleRole={canManage ? () => changeRole(m.id, m.role === 'parent' ? 'caregiver' : 'parent') : undefined}
+                              villageGroup={canManage ? m.villageGroup : undefined}
+                              onChangeGroup={canManage ? (vg) => changeGroup(m.id, vg) : undefined}
                               onDelete={canManage ? () => removeAdult(m.id) : undefined}
                               photoUrl={m.photoUrl}
                               targetType="user"
