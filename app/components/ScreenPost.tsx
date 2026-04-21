@@ -47,10 +47,18 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
   const [isPaid, setIsPaid] = useState(false);
   const [rate, setRate] = useState('22');
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurDay, setRecurDay] = useState<number>(1); // 0=Sun…6=Sat
+  const [recurDays, setRecurDays] = useState<Set<number>>(new Set([1])); // 0=Sun…6=Sat
   const [recurEnds, setRecurEnds] = useState<'date' | 'count'>('count');
   const [recurEndDate, setRecurEndDate] = useState('');
   const [recurCount, setRecurCount] = useState('8');
+
+  function toggleRecurDay(d: number) {
+    setRecurDays(prev => {
+      const next = new Set(prev);
+      if (next.has(d)) { if (next.size > 1) next.delete(d); } else next.add(d);
+      return next;
+    });
+  }
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,7 +78,7 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
         .join(' & ');
       const forWhomFinal = [kidNames, forWhom.trim()].filter(Boolean).join(' · ');
       const recurrence = isRecurring ? {
-        dayOfWeek: recurDay,
+        daysOfWeek: Array.from(recurDays).sort(),
         endsBy: recurEnds === 'date' ? recurEndDate || undefined : undefined,
         occurrences: recurEnds === 'count' ? parseInt(recurCount) || undefined : undefined,
       } : undefined;
@@ -206,18 +214,24 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
           </label>
           {isRecurring && (
             <div style={{ marginTop: 12, padding: '14px 14px 10px', borderRadius: 8, border: `1px solid ${G.hairline2}`, background: G.paper, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <label>
-                <div style={microLabel}>Repeats every</div>
-                <select value={recurDay} onChange={e => setRecurDay(Number(e.target.value))} style={selectStyle}>
-                  <option value={0}>Sunday</option>
-                  <option value={1}>Monday</option>
-                  <option value={2}>Tuesday</option>
-                  <option value={3}>Wednesday</option>
-                  <option value={4}>Thursday</option>
-                  <option value={5}>Friday</option>
-                  <option value={6}>Saturday</option>
-                </select>
-              </label>
+              <div>
+                <div style={microLabel}>Repeats on</div>
+                <div style={{ display: 'flex', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
+                  {['Su','Mo','Tu','We','Th','Fr','Sa'].map((lbl, i) => {
+                    const on = recurDays.has(i);
+                    return (
+                      <button key={i} type="button" onClick={() => toggleRecurDay(i)} style={{
+                        width: 34, height: 34, borderRadius: 17, cursor: 'pointer',
+                        background: on ? G.ink : 'transparent',
+                        color: on ? '#FBF7F0' : G.ink,
+                        border: `1px solid ${on ? G.ink : G.hairline2}`,
+                        fontFamily: G.sans, fontSize: 10, fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{lbl}</button>
+                    );
+                  })}
+                </div>
+              </div>
               <div>
                 <div style={microLabel}>Ends after</div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>

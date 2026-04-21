@@ -173,7 +173,7 @@ function BellCompose({ onRing, onBack, onPost }: { onRing: () => void; onBack?: 
 
         <div style={{ marginTop: 22 }}>
           <GLabel>When</GLabel>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
             <label style={{ display: 'block' }}>
               <div style={{ fontFamily: G.sans, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase', color: RED, fontWeight: 700, marginBottom: 4 }}>Start</div>
               <input
@@ -181,7 +181,7 @@ function BellCompose({ onRing, onBack, onPost }: { onRing: () => void; onBack?: 
                 value={startsAt}
                 onChange={e => setStartsAt(e.target.value)}
                 style={{
-                  width: '100%', padding: '8px 10px', borderRadius: 8,
+                  width: '100%', padding: '8px 10px', borderRadius: 8, boxSizing: 'border-box',
                   border: `1px solid ${RED}`, background: '#FFE6DA',
                   fontFamily: G.display, fontSize: 13, color: G.ink, outline: 'none',
                 }}
@@ -194,7 +194,7 @@ function BellCompose({ onRing, onBack, onPost }: { onRing: () => void; onBack?: 
                 value={endsAt}
                 onChange={e => setEndsAt(e.target.value)}
                 style={{
-                  width: '100%', padding: '8px 10px', borderRadius: 8,
+                  width: '100%', padding: '8px 10px', borderRadius: 8, boxSizing: 'border-box',
                   border: `1px solid ${G.hairline2}`, background: G.paper,
                   fontFamily: G.display, fontSize: 13, color: G.ink, outline: 'none',
                 }}
@@ -298,14 +298,25 @@ function BellRinging({ onBack }: { onBack?: () => void }) {
           <Rung ring={4} label="Whole village" status="pending" time="final · if no one by 4:00" people={[]} />
         </div>
 
-        <div style={{ marginTop: 18, display: 'flex', gap: 8 }}>
+        <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button onClick={onBack} style={{
-            flex: 1, padding: '14px 12px',
-            background: 'transparent', color: G.ink,
-            border: `1px solid ${G.ink}`, borderRadius: 8,
+            width: '100%', padding: '14px 12px',
+            background: G.ink, color: '#FBF7F0',
+            border: 'none', borderRadius: 8,
             fontFamily: G.sans, fontSize: 11, fontWeight: 700, letterSpacing: 1.4,
             textTransform: 'uppercase', cursor: 'pointer',
-          }}>Mark handled</button>
+          }}>Someone is on the way · Mark handled</button>
+          <button onClick={() => {
+            if (confirm('Cancel the bell? Everyone who was notified will receive a cancellation message.')) {
+              onBack?.();
+            }
+          }} style={{
+            width: '100%', padding: '12px 12px',
+            background: 'transparent', color: G.muted,
+            border: `1px solid ${G.hairline2}`, borderRadius: 8,
+            fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+            textTransform: 'uppercase', cursor: 'pointer',
+          }}>Cancel bell · notify everyone</button>
         </div>
       </div>
     </div>
