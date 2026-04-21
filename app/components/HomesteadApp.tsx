@@ -143,31 +143,30 @@ export function HomesteadApp() {
   const { isDualRole } = useHousehold();
   const canSwitchRole = !!DEV_USER_ID && user?.id === DEV_USER_ID;
 
-  const [role, setRole] = useState<Role>('parent');
+  // If DEV_USER_ID is set, seed role from localStorage immediately (before Clerk loads)
+  const [role, setRole] = useState<Role>(() => {
+    if (typeof window !== 'undefined' && DEV_USER_ID) {
+      const saved = localStorage.getItem('hs.role') as Role | null;
+      if (saved === 'parent' || saved === 'caregiver') return saved;
+    }
+    return 'parent';
+  });
   const [screen, setScreen] = useState<TabId>('almanac');
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
   const [bellCount, setBellCount] = useState(0);
   const isMobile = useIsMobile();
 
-  // Load real role from API; dev user may override via localStorage
-  // Dual-role users are always treated as 'parent' for tab bar purposes
+  // Load real role from API — dev user keeps localStorage; others get API role
   useEffect(() => {
+    if (!user?.id) return;
     fetch('/api/household')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        // Dev user: always prefer localStorage so the switcher actually works
-        if (canSwitchRole) {
-          const savedRole = localStorage.getItem('hs.role') as Role | null;
-          setRole(savedRole ?? (data?.user?.role as Role ?? 'parent'));
-          return;
-        }
-        if (data?.isDualRole) {
-          setRole('parent');
-          return;
-        }
-        if (data?.user?.role) {
-          setRole(data.user.role as Role);
-        }
+        if (!data) return;
+        // Dev user: localStorage always wins — don't overwrite their manual switch
+        if (canSwitchRole) return;
+        if (data.isDualRole) { setRole('parent'); return; }
+        if (data.user?.role) setRole(data.user.role as Role);
       })
       .catch(() => {});
   }, [user?.id, canSwitchRole]);
@@ -179,8 +178,8 @@ export function HomesteadApp() {
 
   useEffect(() => { localStorage.setItem('hs.screen', screen); }, [screen]);
   useEffect(() => {
-    if (canSwitchRole) localStorage.setItem('hs.role', role);
-  }, [role, canSwitchRole]);
+    if (DEV_USER_ID) localStorage.setItem('hs.role', role);
+  }, [role]);
 
   const navigate = useCallback((id: TabId) => setScreen(id), []);
 
