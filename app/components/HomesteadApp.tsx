@@ -12,7 +12,7 @@ import { HouseholdProvider, useHousehold } from './HouseholdSwitcher';
 import { InstallHint } from './InstallHint';
 import { RefreshButton } from './RefreshButton';
 
-const DEV_USER_ID = process.env.NEXT_PUBLIC_DEV_CLERK_USER_ID;
+const DEV_USER_ID = 'user_3CeQiFzHv2dCasCCiNx7xGEn8Vu';
 
 type TabId = 'almanac' | 'post' | 'village' | 'shifts' | 'bell';
 type Role = 'parent' | 'caregiver';
