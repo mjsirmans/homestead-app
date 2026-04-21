@@ -1,28 +1,62 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel } from './shared';
 import { HouseholdSwitcher } from './HouseholdSwitcher';
 
-const shifts = [
-  { when: 'Tonight', dayLarge: '17', month: 'OCT', dow: 'Thu', time: '5:30 – 8:00 PM', dur: '2.5h', family: 'The Parks', title: 'Pickup + dinner', note: "Maya (7) & Theo (4). Pasta's in the fridge.", pay: '$18/hr', fresh: false },
-  { when: 'Saturday · Anniversary', dayLarge: '19', month: 'OCT', dow: 'Sat', time: '6:00 – 10:00 PM', dur: '4h', family: 'The Parks', title: 'Date night', note: 'Bedtime routine. Parents nearby all night.', pay: '$22/hr', fresh: true },
-  { when: 'Next Tuesday', dayLarge: '22', month: 'OCT', dow: 'Tue', time: '3:00 – 5:30 PM', dur: '2.5h', family: 'The Okonkwos', title: 'Piano + homework', note: 'Chidi (9). Walking distance from school.', pay: '$20/hr', fresh: false },
-  { when: 'Next Saturday', dayLarge: '26', month: 'OCT', dow: 'Sat', time: '10:00 AM – 2:00 PM', dur: '4h', family: 'The Lees', title: 'Park + lunch', note: 'Two kids, siblings. Has a dog.', pay: '$20/hr', fresh: false },
-];
+type ShiftRow = {
+  shift: {
+    id: string;
+    title: string;
+    forWhom: string | null;
+    notes: string | null;
+    startsAt: string;
+    endsAt: string;
+    rateCents: number | null;
+    status: 'open' | 'claimed' | 'cancelled' | 'done';
+    householdId: string;
+    claimedByUserId: string | null;
+  };
+  household: { id: string; name: string; glyph: string } | null;
+  creator: { id: string; name: string } | null;
+};
 
-function ShiftRow({ when, dayLarge, month, dow, time, dur, family, title, note, pay, fresh, first }: typeof shifts[0] & { first?: boolean }) {
+function fmtWhen(startIso: string) {
+  const s = new Date(startIso);
+  const now = new Date();
+  const days = Math.round((s.getTime() - now.setHours(0, 0, 0, 0)) / 86400000);
+  if (days === 0) return 'Tonight';
+  if (days === 1) return 'Tomorrow';
+  if (days > 1 && days < 7) return s.toLocaleDateString(undefined, { weekday: 'long' });
+  return s.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function fmtTimeRange(startIso: string, endIso: string) {
+  const s = new Date(startIso);
+  const e = new Date(endIso);
+  const t = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${t(s)} – ${t(e)}`;
+}
+function durationH(startIso: string, endIso: string) {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  return `${(ms / 3600000).toFixed(ms % 3600000 === 0 ? 0 : 1)}h`;
+}
+function dollars(cents: number | null) {
+  if (cents == null) return '—';
+  return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}/hr`;
+}
+
+function ShiftCard({ row, onClaim, first, claiming }: {
+  row: ShiftRow; onClaim: (id: string) => void; first?: boolean; claiming?: boolean;
+}) {
+  const s = new Date(row.shift.startsAt);
+  const month = s.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
+  const dayLarge = String(s.getDate());
+  const dow = s.toLocaleDateString(undefined, { weekday: 'short' });
+
   return (
     <article style={{ paddingTop: first ? 4 : 16, paddingBottom: 16, borderBottom: `1px solid ${G.hairline}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <GLabel color={G.ink}>{when}</GLabel>
-        {fresh && (
-          <div style={{
-            padding: '2px 8px', borderRadius: 100,
-            background: G.claySoft, color: G.clay,
-            fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
-          }}>New</div>
-        )}
+        <GLabel color={G.ink}>{fmtWhen(row.shift.startsAt)}</GLabel>
         <div style={{ flex: 1, height: 1, background: G.hairline }} />
       </div>
       <div style={{ display: 'flex', gap: 12 }}>
@@ -36,61 +70,121 @@ function ShiftRow({ when, dayLarge, month, dow, time, dur, family, title, note, 
           <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 10, color: G.muted, paddingBottom: 4 }}>{dow}</div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: G.display, fontSize: 18, fontWeight: 500, color: G.ink, lineHeight: 1.15 }}>{title}</div>
+          <div style={{ fontFamily: G.display, fontSize: 18, fontWeight: 500, color: G.ink, lineHeight: 1.15 }}>{row.shift.title}</div>
           <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.ink2, marginTop: 2 }}>
-            {time} · <span style={{ fontStyle: 'normal', color: G.muted }}>{family}</span>
+            {fmtTimeRange(row.shift.startsAt, row.shift.endsAt)}
+            {row.household && <> · <span style={{ fontStyle: 'normal', color: G.muted }}>{row.household.glyph} {row.household.name}</span></>}
           </div>
-          <div style={{ fontSize: 12, color: G.ink2, marginTop: 6, lineHeight: 1.4 }}>{note}</div>
+          {row.shift.forWhom && (
+            <div style={{ fontSize: 12, color: G.ink2, marginTop: 4, lineHeight: 1.4 }}>For {row.shift.forWhom}</div>
+          )}
+          {row.shift.notes && (
+            <div style={{ fontSize: 12, color: G.ink2, marginTop: 4, lineHeight: 1.4 }}>{row.shift.notes}</div>
+          )}
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingLeft: 70 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ fontFamily: G.display, fontSize: 14, color: G.ink }}>{pay}</span>
-          <span style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>· {dur}</span>
+          <span style={{ fontFamily: G.display, fontSize: 14, color: G.ink }}>{dollars(row.shift.rateCents)}</span>
+          <span style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>· {durationH(row.shift.startsAt, row.shift.endsAt)}</span>
         </div>
-        <button style={{
-          padding: '7px 14px',
-          background: G.ink, color: '#FBF7F0',
-          border: 'none', borderRadius: 100,
-          fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.4,
-          textTransform: 'uppercase', cursor: 'pointer',
-        }}>Claim</button>
+        <button
+          onClick={() => onClaim(row.shift.id)}
+          disabled={claiming}
+          style={{
+            padding: '7px 14px',
+            background: G.ink, color: '#FBF7F0',
+            border: 'none', borderRadius: 100,
+            fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.4,
+            textTransform: 'uppercase', cursor: claiming ? 'wait' : 'pointer',
+            opacity: claiming ? 0.7 : 1,
+          }}>{claiming ? 'Claiming…' : 'Claim'}</button>
       </div>
     </article>
   );
 }
 
 export function ScreenShifts() {
+  const [rows, setRows] = useState<ShiftRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const res = await fetch('/api/shifts?scope=village');
+      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      const data = await res.json() as { shifts: ShiftRow[] };
+      setRows(data.shifts);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load');
+      setRows([]);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function claim(id: string) {
+    setClaimingId(id);
+    try {
+      const res = await fetch(`/api/shifts/${id}/claim`, { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'claim failed');
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'claim failed');
+    } finally {
+      setClaimingId(null);
+    }
+  }
+
+  const openRows = (rows || []).filter(r => r.shift.status === 'open');
+
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
-        leftAction={<HouseholdSwitcher />} right="4 open"
+        leftAction={<HouseholdSwitcher />} right={rows ? `${openRows.length} open` : ''}
         title="Open Shifts"
-        tagline="From three families in your village. Claim one to lock it in."
-        folioLeft="No. 142" folioRight="The Slate"
+        tagline="From families in your village. Claim one to lock it in."
+        folioRight="The Slate"
       />
 
-      <div style={{ padding: '4px 24px 10px', display: 'flex', gap: 6, overflowX: 'auto' }}>
-        {['All', 'This week', 'Weekends', 'Evenings', 'Parks fam'].map((f, i) => (
-          <div key={i} style={{
-            padding: '6px 12px', borderRadius: 100, flexShrink: 0,
-            background: i === 0 ? G.ink : 'transparent',
-            color: i === 0 ? '#FBF7F0' : G.ink2,
-            border: `1px solid ${i === 0 ? G.ink : G.hairline2}`,
-            fontFamily: G.sans, fontSize: 11, fontWeight: 500,
-          }}>{f}</div>
-        ))}
-      </div>
-
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 24px 120px' }}>
-        {shifts.map((s, i) => <ShiftRow key={i} {...s} first={i === 0} />)}
-        <div style={{
-          marginTop: 18, padding: '14px 12px', textAlign: 'center',
-          borderTop: `1px solid ${G.hairline}`,
-          fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 12,
-        }}>
-          That&apos;s the whole slate. Check back tomorrow.
-        </div>
+        {error && (
+          <div style={{
+            marginTop: 10, padding: '10px 12px', borderRadius: 8,
+            background: '#FFE6DA', color: '#7A2F12',
+            fontFamily: G.serif, fontStyle: 'italic', fontSize: 13,
+          }}>{error}</div>
+        )}
+        {rows === null && (
+          <div style={{ padding: '30px 0', textAlign: 'center', fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 13 }}>
+            Loading the slate…
+          </div>
+        )}
+        {rows && openRows.length === 0 && (
+          <div style={{
+            marginTop: 18, padding: '30px 16px', textAlign: 'center',
+            border: `1px dashed ${G.hairline2}`, borderRadius: 8,
+            fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 13,
+          }}>
+            No open shifts right now. Check back later.
+          </div>
+        )}
+        {openRows.map((r, i) => (
+          <ShiftCard key={r.shift.id} row={r} first={i === 0} onClaim={claim} claiming={claimingId === r.shift.id} />
+        ))}
+        {rows && openRows.length > 0 && (
+          <div style={{
+            marginTop: 18, padding: '14px 12px', textAlign: 'center',
+            borderTop: `1px solid ${G.hairline}`,
+            fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 12,
+          }}>
+            That&apos;s the whole slate.
+          </div>
+        )}
       </div>
     </div>
   );

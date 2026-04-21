@@ -176,9 +176,9 @@ export function HomesteadApp() {
     setScreen('bell');
   }, []);
 
-  const handlePost = useCallback(() => {
-    setToast({ msg: 'Posted to the Village — Ruth & Mae were notified', key: Date.now() });
-    setScreen('shifts');
+  const handlePost = useCallback((msg?: string) => {
+    setToast({ msg: msg || 'Posted to the Village', key: Date.now() });
+    setScreen('home');
   }, []);
 
   const handleRoleChange = (r: Role) => {

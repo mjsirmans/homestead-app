@@ -1,7 +1,8 @@
-import { pgTable, text, timestamp, uuid, pgEnum, date, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, pgEnum, date, unique, integer } from 'drizzle-orm/pg-core';
 
 export const appRoleEnum = pgEnum('app_role', ['parent', 'caregiver']);
 export const villageGroupEnum = pgEnum('village_group', ['inner', 'family', 'sitter']);
+export const shiftStatusEnum = pgEnum('shift_status', ['open', 'claimed', 'cancelled', 'done']);
 
 export const households = pgTable('households', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -32,5 +33,21 @@ export const kids = pgTable('kids', {
   name: text('name').notNull(),
   birthday: date('birthday'),
   notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const shifts = pgTable('shifts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  householdId: uuid('household_id').notNull().references(() => households.id, { onDelete: 'cascade' }),
+  createdByUserId: uuid('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  claimedByUserId: uuid('claimed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  forWhom: text('for_whom'),
+  notes: text('notes'),
+  startsAt: timestamp('starts_at').notNull(),
+  endsAt: timestamp('ends_at').notNull(),
+  rateCents: integer('rate_cents'),
+  status: shiftStatusEnum('status').notNull().default('open'),
+  claimedAt: timestamp('claimed_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
