@@ -47,6 +47,23 @@ export async function GET(req: NextRequest) {
         ),
         gte(shifts.endsAt, new Date()),
       );
+    } else if (scope === 'all') {
+      // Unified view across all households:
+      // - As parent: shifts in households where user has role=parent (created by anyone in that hh)
+      // - As caregiver: open shifts in households where user has role=caregiver
+      // - Always: shifts the user personally claimed (regardless of role)
+      if (!hhIds.length) return NextResponse.json({ shifts: [], meClerkUserId: userId });
+      const parentHhIds = myUserRows.filter(u => u.role === 'parent').map(u => u.householdId);
+      const caregiverHhIds = myUserRows.filter(u => u.role === 'caregiver').map(u => u.householdId);
+      const clauses = [];
+      if (parentHhIds.length) clauses.push(inArray(shifts.householdId, parentHhIds));
+      if (caregiverHhIds.length) clauses.push(and(inArray(shifts.householdId, caregiverHhIds), eq(shifts.status, 'open')));
+      if (myUserIds.length) clauses.push(inArray(shifts.claimedByUserId, myUserIds));
+      if (!clauses.length) return NextResponse.json({ shifts: [], meClerkUserId: userId });
+      where = and(
+        gte(shifts.endsAt, new Date()),
+        or(...clauses as [typeof clauses[0], ...typeof clauses]),
+      );
     } else {
       where = and(
         eq(shifts.householdId, household.id),
@@ -54,7 +71,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const orderBy = scope === 'village' ? asc(shifts.startsAt) : desc(shifts.startsAt);
+    const orderBy = (scope === 'village' || scope === 'all') ? asc(shifts.startsAt) : desc(shifts.startsAt);
 
     const rows = await db.select({
       shift: shifts,

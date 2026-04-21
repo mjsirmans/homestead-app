@@ -43,10 +43,26 @@ function bucketOf(iso: string): 'today' | 'tomorrow' | 'week' | 'later' {
   return 'later';
 }
 
-function StatusCard({ row, accent, tagline, onCancel, onClaim, cancelling, claiming }: {
+function HouseholdChip({ name, glyph }: { name: string; glyph: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '2px 8px', borderRadius: 100,
+      background: G.hairline2, marginBottom: 6,
+      fontFamily: G.sans, fontSize: 9, fontWeight: 700,
+      letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted,
+    }}>
+      <span style={{ fontSize: 11 }}>{glyph}</span>
+      {name}
+    </span>
+  );
+}
+
+function StatusCard({ row, accent, tagline, onCancel, onClaim, cancelling, claiming, showHousehold }: {
   row: ShiftRow; accent: string; tagline: string;
   onCancel?: (id: string) => void; cancelling?: boolean;
   onClaim?: (id: string) => void; claiming?: boolean;
+  showHousehold?: boolean;
 }) {
   return (
     <div style={{
@@ -57,6 +73,9 @@ function StatusCard({ row, accent, tagline, onCancel, onClaim, cancelling, claim
         position: 'absolute', top: -1, left: -1, width: 4, height: 'calc(100% + 2px)',
         background: accent, borderRadius: '8px 0 0 8px',
       }} />
+      {showHousehold && row.household && (
+        <HouseholdChip name={row.household.name} glyph={row.household.glyph} />
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           <GLabel color={accent}>{tagline}</GLabel>
@@ -143,7 +162,8 @@ export function ScreenHome({ onRing, role = 'parent' }: {
   onRing?: () => void;
   role?: 'parent' | 'caregiver';
 }) {
-  const { active } = useHousehold();
+  const { active, all } = useHousehold();
+  const multiHousehold = all.length > 1;
   const [rows, setRows] = useState<ShiftRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -152,7 +172,9 @@ export function ScreenHome({ onRing, role = 'parent' }: {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const scope = role === 'caregiver' ? 'village' : 'household';
+      // Multi-household users get a unified view across all their households.
+      // Single-household: parent sees their own household, caregiver sees open village shifts.
+      const scope = multiHousehold ? 'all' : role === 'caregiver' ? 'village' : 'household';
       const res = await fetch(`/api/shifts?scope=${scope}`);
       if (!res.ok) throw new Error(`Failed (${res.status})`);
       const data = await res.json() as { shifts: ShiftRow[] };
@@ -161,9 +183,9 @@ export function ScreenHome({ onRing, role = 'parent' }: {
       setError(err instanceof Error ? err.message : 'Failed to load');
       setRows([]);
     }
-  }, [role]);
+  }, [role, multiHousehold]);
 
-  useEffect(() => { load(); }, [load, active?.id]);
+  useEffect(() => { load(); }, [load, active?.id, multiHousehold]);
 
   async function cancelShift(id: string) {
     setCancellingId(id);
@@ -202,12 +224,14 @@ export function ScreenHome({ onRing, role = 'parent' }: {
   const tomorrow = upcoming.filter(r => bucketOf(r.shift.startsAt) === 'tomorrow');
   const week = upcoming.filter(r => bucketOf(r.shift.startsAt) === 'week');
 
-  const title = role === 'caregiver' ? 'Your Week' : (active?.name || 'The Homestead');
+  const title = multiHousehold ? 'Your Week' : role === 'caregiver' ? 'Your Week' : (active?.name || 'The Homestead');
   const tagline = rows === null ? 'Loading…'
     : upcoming.length === 0 ? 'Nothing on the books yet.'
-    : role === 'parent'
-      ? `${upcoming.filter(r => r.shift.status === 'claimed').length} claimed · ${upcoming.filter(r => r.shift.status === 'open').length} still open.`
-      : `${upcoming.filter(r => r.shift.status === 'claimed').length} shifts claimed by someone in your village.`;
+    : multiHousehold
+      ? `${upcoming.filter(r => r.shift.status === 'open').length} open · ${upcoming.filter(r => r.claimedByMe).length} you're covering.`
+      : role === 'parent'
+        ? `${upcoming.filter(r => r.shift.status === 'claimed').length} claimed · ${upcoming.filter(r => r.shift.status === 'open').length} still open.`
+        : `${upcoming.filter(r => r.shift.status === 'claimed').length} shifts claimed by someone in your village.`;
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
@@ -245,6 +269,7 @@ export function ScreenHome({ onRing, role = 'parent' }: {
               cancelling={cancellingId === r.shift.id}
               onClaim={r.shift.status === 'open' && !r.createdByMe ? claimShift : undefined}
               claiming={claimingId === r.shift.id}
+              showHousehold={multiHousehold}
             />
           ))}
         </>}
@@ -260,6 +285,7 @@ export function ScreenHome({ onRing, role = 'parent' }: {
               cancelling={cancellingId === r.shift.id}
               onClaim={r.shift.status === 'open' && !r.createdByMe ? claimShift : undefined}
               claiming={claimingId === r.shift.id}
+              showHousehold={multiHousehold}
             />
           ))}
         </>}
@@ -275,6 +301,7 @@ export function ScreenHome({ onRing, role = 'parent' }: {
               cancelling={cancellingId === r.shift.id}
               onClaim={r.shift.status === 'open' && !r.createdByMe ? claimShift : undefined}
               claiming={claimingId === r.shift.id}
+              showHousehold={multiHousehold}
             />
           ))}
         </>}
