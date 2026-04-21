@@ -1,0 +1,241 @@
+'use client';
+import React, { useState, useEffect, useCallback } from 'react';
+import { G } from './tokens';
+import { GTabBar } from './shared';
+import { ScreenHome } from './ScreenHome';
+import { ScreenPost } from './ScreenPost';
+import { ScreenShifts } from './ScreenShifts';
+import { ScreenAlmanac } from './ScreenAlmanac';
+import { ScreenBell } from './ScreenBell';
+import { ScreenTimeOff } from './ScreenTimeOff';
+import { ScreenVillage } from './ScreenVillage';
+
+type TabId = 'home' | 'almanac' | 'post' | 'bell' | 'village' | 'shifts' | 'timeoff';
+type Role = 'parent' | 'caregiver';
+
+function Toast({ msg, onDone }: { msg: string; onDone: () => void }) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => { setVisible(false); setTimeout(onDone, 300); }, 2500);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div style={{
+      position: 'absolute', bottom: 110, left: 24, right: 24, zIndex: 99,
+      transition: 'opacity 0.3s, transform 0.3s',
+      opacity: visible ? 1 : 0,
+      transform: visible ? 'translateY(0)' : 'translateY(10px)',
+    }}>
+      <div style={{
+        background: G.ink, color: '#FBF7F0',
+        borderRadius: 100, padding: '12px 20px', textAlign: 'center',
+        fontFamily: G.serif, fontStyle: 'italic', fontSize: 13,
+        boxShadow: '0 4px 16px rgba(27,23,19,0.25)',
+      }}>{msg}</div>
+    </div>
+  );
+}
+
+function RoleSwitcher({ role, onChange }: { role: Role; onChange: (r: Role) => void }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontFamily: G.sans, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: '#FBF7F0', opacity: 0.5, marginBottom: 6 }}>Role</div>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {(['parent', 'caregiver'] as Role[]).map(r => (
+          <button key={r} onClick={() => onChange(r)} style={{
+            flex: 1, padding: '8px 6px', borderRadius: 6,
+            background: role === r ? '#FBF7F0' : 'transparent',
+            color: role === r ? G.ink : '#FBF7F0',
+            border: `1px solid ${role === r ? '#FBF7F0' : 'rgba(255,255,255,0.3)'}`,
+            fontFamily: G.sans, fontSize: 10, fontWeight: 700,
+            letterSpacing: 0.8, textTransform: 'capitalize', cursor: 'pointer',
+          }}>{r}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function HomesteadApp() {
+  const [role, setRole] = useState<Role>('parent');
+  const [screen, setScreen] = useState<TabId>('home');
+  const [bellCompose, setBellCompose] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Restore from localStorage
+  useEffect(() => {
+    const savedScreen = localStorage.getItem('hs.screen') as TabId | null;
+    const savedRole   = localStorage.getItem('hs.role')   as Role | null;
+    if (savedScreen) setScreen(savedScreen);
+    if (savedRole)   setRole(savedRole);
+  }, []);
+
+  // Persist
+  useEffect(() => { localStorage.setItem('hs.screen', screen); }, [screen]);
+  useEffect(() => { localStorage.setItem('hs.role',   role);   }, [role]);
+
+  // Keyboard shortcuts 1-7
+  useEffect(() => {
+    const parentScreens: TabId[]    = ['home', 'almanac', 'post',   'bell', 'village', 'almanac', 'home'];
+    const caregiverScreens: TabId[] = ['home', 'shifts',  'bell', 'almanac', 'timeoff', 'home', 'home'];
+    const map = role === 'caregiver' ? caregiverScreens : parentScreens;
+    const handler = (e: KeyboardEvent) => {
+      const n = parseInt(e.key);
+      if (n >= 1 && n <= 7) { navigate(map[n - 1]); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [role]);
+
+  const navigate = useCallback((id: TabId) => {
+    if (id === 'bell') setBellCompose(false);
+    setScreen(id);
+  }, []);
+
+  const handleRing = useCallback(() => {
+    setBellCompose(true);
+    setScreen('bell');
+  }, []);
+
+  const handlePost = useCallback(() => {
+    setToast({ msg: 'Posted to the Village — Ruth & Mae were notified', key: Date.now() });
+    setScreen('shifts');
+  }, []);
+
+  const handleRoleChange = (r: Role) => {
+    setRole(r);
+    setScreen('home');
+    setDrawerOpen(false);
+  };
+
+  function renderScreen() {
+    switch (screen) {
+      case 'home':    return <ScreenHome onRing={handleRing} role={role} />;
+      case 'post':    return <ScreenPost onCancel={() => setScreen('home')} onPost={handlePost} />;
+      case 'shifts':  return <ScreenShifts />;
+      case 'almanac': return <ScreenAlmanac role={role} />;
+      case 'bell':    return <ScreenBell initialCompose={bellCompose} role={role} />;
+      case 'timeoff': return <ScreenTimeOff />;
+      case 'village': return <ScreenVillage />;
+      default:        return <ScreenHome onRing={handleRing} role={role} />;
+    }
+  }
+
+  const currentTab: TabId = screen === 'post' ? 'post' : screen;
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#1a120b', gap: 32, padding: '24px 16px', flexWrap: 'wrap',
+    }}>
+      {/* Left rail — role switcher + shortcuts */}
+      <div style={{
+        width: 140, flexShrink: 0,
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          fontFamily: G.display, fontStyle: 'italic', fontSize: 18, color: '#FBF7F0',
+          marginBottom: 24, lineHeight: 1.2,
+        }}>Homestead</div>
+        <RoleSwitcher role={role} onChange={handleRoleChange} />
+        <div style={{ fontFamily: G.sans, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: '#FBF7F0', opacity: 0.5, marginBottom: 8 }}>Shortcuts</div>
+        {role === 'parent' ? (
+          [['1', 'Week'], ['2', 'Almanac'], ['3', 'Post'], ['4', 'Bell'], ['5', 'Village']].map(([k, l]) => (
+            <div key={k} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
+              <div style={{
+                width: 18, height: 18, borderRadius: 4,
+                background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: G.sans, fontSize: 10, fontWeight: 700, color: '#FBF7F0',
+              }}>{k}</div>
+              <span style={{ fontFamily: G.sans, fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{l}</span>
+            </div>
+          ))
+        ) : (
+          [['1', 'Week'], ['2', 'Shifts'], ['3', 'Bell'], ['4', 'Schedule'], ['5', 'Time Off']].map(([k, l]) => (
+            <div key={k} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
+              <div style={{
+                width: 18, height: 18, borderRadius: 4,
+                background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: G.sans, fontSize: 10, fontWeight: 700, color: '#FBF7F0',
+              }}>{k}</div>
+              <span style={{ fontFamily: G.sans, fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{l}</span>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Phone frame */}
+      <div style={{
+        width: 402, height: 874, borderRadius: 52, overflow: 'hidden',
+        position: 'relative', background: G.bg,
+        boxShadow: '0 30px 60px rgba(40,30,20,0.22), 0 0 0 8px #0e0906, 0 0 0 10px #2a1e14',
+        fontFamily: G.sans, color: G.ink, flexShrink: 0,
+      }}>
+        {/* Dynamic island */}
+        <div style={{
+          position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+          width: 112, height: 33, borderRadius: 22, background: '#1a120b', zIndex: 55,
+        }} />
+
+        {/* Status bar */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          display: 'flex', justifyContent: 'space-between', padding: '18px 28px 6px',
+          fontFamily: '-apple-system, system-ui', fontWeight: 600, fontSize: 15, color: G.ink,
+          zIndex: 40,
+        }}>
+          <span>9:41</span>
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+            <svg width="17" height="11" viewBox="0 0 17 11">
+              <rect x="0" y="7" width="3" height="4" rx="0.6" fill={G.ink} />
+              <rect x="4.5" y="5" width="3" height="6" rx="0.6" fill={G.ink} />
+              <rect x="9" y="2.5" width="3" height="8.5" rx="0.6" fill={G.ink} />
+              <rect x="13.5" y="0" width="3" height="11" rx="0.6" fill={G.ink} />
+            </svg>
+            <svg width="25" height="12" viewBox="0 0 27 13">
+              <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke={G.ink} strokeOpacity="0.4" fill="none" />
+              <rect x="2" y="2" width="18" height="9" rx="1.6" fill={G.ink} />
+            </svg>
+          </div>
+        </div>
+
+        {/* Screen content */}
+        <div style={{
+          position: 'absolute', top: 44, left: 0, right: 0, bottom: 0,
+          overflow: 'hidden',
+        }}>
+          {renderScreen()}
+        </div>
+
+        {/* Tab bar */}
+        <GTabBar active={currentTab} onNavigate={navigate} role={role} />
+
+        {/* Home indicator */}
+        <div style={{
+          position: 'absolute', bottom: 6, left: 0, right: 0,
+          display: 'flex', justifyContent: 'center', zIndex: 60,
+        }}>
+          <div style={{ width: 134, height: 5, borderRadius: 100, background: 'rgba(27,23,19,0.4)' }} />
+        </div>
+
+        {/* Toast */}
+        {toast && (
+          <Toast key={toast.key} msg={toast.msg} onDone={() => setToast(null)} />
+        )}
+      </div>
+
+      {/* Right spacer / credits */}
+      <div style={{ width: 140, flexShrink: 0 }}>
+        <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.7 }}>
+          <div>Homestead</div>
+          <div>Family childcare</div>
+          <div>coordination</div>
+          <br />
+          <div>Design prototype</div>
+          <div>Oct 2025</div>
+        </div>
+      </div>
+    </div>
+  );
+}
