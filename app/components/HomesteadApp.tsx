@@ -3,12 +3,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { G } from './tokens';
 import { GTabBar } from './shared';
-import { ScreenHome } from './ScreenHome';
 import { ScreenPost } from './ScreenPost';
 import { ScreenShifts } from './ScreenShifts';
 import { ScreenAlmanac } from './ScreenAlmanac';
 import { ScreenBell } from './ScreenBell';
-import { ScreenTimeOff } from './ScreenTimeOff';
 import { ScreenVillage } from './ScreenVillage';
 import { HouseholdProvider } from './HouseholdSwitcher';
 import { InstallHint } from './InstallHint';
@@ -16,7 +14,7 @@ import { RefreshButton } from './RefreshButton';
 
 const DEV_USER_ID = process.env.NEXT_PUBLIC_DEV_CLERK_USER_ID;
 
-type TabId = 'home' | 'almanac' | 'post' | 'bell' | 'village' | 'shifts' | 'timeoff';
+type TabId = 'almanac' | 'post' | 'village' | 'shifts' | 'bell';
 type Role = 'parent' | 'caregiver';
 
 function useIsMobile() {
@@ -145,9 +143,9 @@ export function HomesteadApp() {
   const canSwitchRole = !!DEV_USER_ID && user?.id === DEV_USER_ID;
 
   const [role, setRole] = useState<Role>('parent');
-  const [screen, setScreen] = useState<TabId>('home');
-  const [bellCompose, setBellCompose] = useState(false);
+  const [screen, setScreen] = useState<TabId>('almanac');
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
+  const [bellCount, setBellCount] = useState(0);
   const isMobile = useIsMobile();
 
   // Load real role from API; dev user may override via localStorage
@@ -178,52 +176,42 @@ export function HomesteadApp() {
     if (canSwitchRole) localStorage.setItem('hs.role', role);
   }, [role, canSwitchRole]);
 
-  const navigate = useCallback((id: TabId) => {
-    if (id === 'bell') setBellCompose(false);
-    setScreen(id);
-  }, []);
+  const navigate = useCallback((id: TabId) => setScreen(id), []);
 
   useEffect(() => {
-    const parentScreens: TabId[]    = ['home', 'almanac', 'post',   'bell', 'village', 'almanac', 'home'];
-    const caregiverScreens: TabId[] = ['home', 'shifts',  'bell', 'timeoff', 'village', 'home', 'home'];
-    const map = role === 'caregiver' ? caregiverScreens : parentScreens;
+    const parentMap:    TabId[] = ['almanac', 'post',   'village'];
+    const caregiverMap: TabId[] = ['almanac', 'shifts', 'village'];
+    const map = role === 'caregiver' ? caregiverMap : parentMap;
     const handler = (e: KeyboardEvent) => {
       const n = parseInt(e.key);
-      if (n >= 1 && n <= 7) navigate(map[n - 1]);
+      if (n >= 1 && n <= map.length) navigate(map[n - 1]);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [role, navigate]);
 
-  const handleRing = useCallback(() => {
-    setBellCompose(true);
-    setScreen('bell');
-  }, []);
+  const handleRing = useCallback(() => setScreen('bell'), []);
 
   const handlePost = useCallback((msg?: string) => {
     setToast({ msg: msg || 'Posted to the Village', key: Date.now() });
-    setScreen('home');
+    setScreen('almanac');
   }, []);
 
   const handleRoleChange = (r: Role) => {
     setRole(r);
-    setScreen('home');
+    setScreen('almanac');
   };
 
   function renderScreen() {
     switch (screen) {
-      case 'home':    return <ScreenHome onRing={handleRing} role={role} />;
-      case 'post':    return <ScreenPost onCancel={() => setScreen('home')} onPost={handlePost} />;
+      case 'almanac': return <ScreenAlmanac role={role} onRing={handleRing} />;
+      case 'post':    return <ScreenPost onCancel={() => setScreen('almanac')} onPost={handlePost} />;
       case 'shifts':  return <ScreenShifts />;
-      case 'almanac': return <ScreenAlmanac role={role} />;
-      case 'bell':    return <ScreenBell initialCompose={bellCompose} role={role} />;
-      case 'timeoff': return <ScreenTimeOff />;
+      case 'bell':    return <ScreenBell initialCompose={true} role={role} onBack={() => setScreen('almanac')} />;
       case 'village': return <ScreenVillage />;
-      default:        return <ScreenHome onRing={handleRing} role={role} />;
+      default:        return <ScreenAlmanac role={role} onRing={handleRing} />;
     }
   }
-
-  const currentTab: TabId = screen === 'post' ? 'post' : screen;
 
   // ── MOBILE LAYOUT ────────────────────────────────────────────────────────
   if (isMobile) {
@@ -244,7 +232,7 @@ export function HomesteadApp() {
           }}>
             {renderScreen()}
           </div>
-          <GTabBar active={currentTab} onNavigate={navigate} role={role} />
+          <GTabBar active={screen === 'bell' ? 'almanac' : screen} onNavigate={navigate} role={role} bellCount={bellCount} />
           {toast && <Toast key={toast.key} msg={toast.msg} onDone={() => setToast(null)} />}
           <InstallHint />
         </div>
@@ -267,8 +255,8 @@ export function HomesteadApp() {
         {canSwitchRole && <RoleSwitcherDesktop role={role} onChange={handleRoleChange} />}
         <div style={{ fontFamily: G.sans, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: '#FBF7F0', opacity: 0.5, marginBottom: 8 }}>Shortcuts</div>
         {(role === 'parent'
-          ? [['1', 'Week'], ['2', 'Almanac'], ['3', 'Post'], ['4', 'Bell'], ['5', 'Village']]
-          : [['1', 'Week'], ['2', 'Shifts'], ['3', 'Bell'], ['4', 'Time Off'], ['5', 'Village']]
+          ? [['1', 'Almanac'], ['2', 'Post'], ['3', 'Village']]
+          : [['1', 'Almanac'], ['2', 'Shifts'], ['3', 'Village']]
         ).map(([k, l]) => (
           <div key={k} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
             <div style={{
@@ -316,7 +304,7 @@ export function HomesteadApp() {
         <div style={{ position: 'absolute', top: 44, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
           {renderScreen()}
         </div>
-        <GTabBar active={currentTab} onNavigate={navigate} role={role} />
+        <GTabBar active={screen === 'bell' ? 'almanac' : screen} onNavigate={navigate} role={role} bellCount={bellCount} />
         <div style={{
           position: 'absolute', bottom: 6, left: 0, right: 0,
           display: 'flex', justifyContent: 'center', zIndex: 60,

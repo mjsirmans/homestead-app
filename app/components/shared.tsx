@@ -150,29 +150,38 @@ export const Icons = {
         stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  village: (c: string) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8" r="3" stroke={c} strokeWidth="1.5" />
+      <circle cx="5.5" cy="9.5" r="2" stroke={c} strokeWidth="1.5" />
+      <circle cx="18.5" cy="9.5" r="2" stroke={c} strokeWidth="1.5" />
+      <path d="M2 19.5c0-2 1.6-3.5 3.5-3.5s3.5 1.5 3.5 3.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M15 19.5c0-2 1.6-3.5 3.5-3.5s3.5 1.5 3.5 3.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M7.5 19.5c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
 };
 
 // ── GTabBar ───────────────────────────────────────────────────────────────
-type TabId = 'home' | 'almanac' | 'post' | 'bell' | 'village' | 'shifts' | 'timeoff';
+type TabId = 'almanac' | 'post' | 'village' | 'shifts';
 
-export function GTabBar({ active = 'home', onNavigate, role = 'parent' }: {
+export function GTabBar({ active = 'almanac', onNavigate, role = 'parent', bellCount = 0 }: {
   active?: TabId;
   onNavigate?: (id: TabId) => void;
   role?: 'parent' | 'caregiver';
+  bellCount?: number;
 }) {
-  const parentTabs: { id: TabId; label: string; icon: (c: string) => React.ReactNode; primary?: boolean }[] = [
-    { id: 'home',    label: 'Week',    icon: Icons.home },
+  type Tab = { id: TabId; label: string; icon: (c: string) => React.ReactNode; primary?: boolean; badge?: number };
+
+  const parentTabs: Tab[] = [
     { id: 'almanac', label: 'Almanac', icon: Icons.almanac },
-    { id: 'post',    label: 'Post',    icon: Icons.post,    primary: true },
-    { id: 'bell',    label: 'Bell',    icon: Icons.bell },
-    { id: 'village', label: 'Village', icon: Icons.shifts },
+    { id: 'village', label: 'Village', icon: Icons.village },
+    { id: 'post',    label: 'Post',    icon: Icons.post, primary: true },
   ];
-  const caregiverTabs: { id: TabId; label: string; icon: (c: string) => React.ReactNode; primary?: boolean }[] = [
-    { id: 'home',    label: 'Week',     icon: Icons.home },
-    { id: 'bell',    label: 'Bell',     icon: Icons.bell },
-    { id: 'shifts',  label: 'Shifts',   icon: Icons.shifts,  primary: true },
-    { id: 'timeoff', label: 'Time Off', icon: Icons.almanac },
-    { id: 'village', label: 'Village',  icon: Icons.shifts },
+  const caregiverTabs: Tab[] = [
+    { id: 'almanac', label: 'Almanac', icon: Icons.almanac },
+    { id: 'village', label: 'Village', icon: Icons.village },
+    { id: 'shifts',  label: 'Shifts',  icon: Icons.shifts, primary: true, badge: bellCount },
   ];
   const tabs = role === 'caregiver' ? caregiverTabs : parentTabs;
 
@@ -186,7 +195,7 @@ export function GTabBar({ active = 'home', onNavigate, role = 'parent' }: {
         background: G.paper,
         border: `1px solid ${G.hairline}`,
         borderRadius: 18,
-        display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)',
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
         alignItems: 'center',
         boxShadow: '0 4px 16px rgba(27,23,19,0.07)',
       }}>
@@ -195,17 +204,33 @@ export function GTabBar({ active = 'home', onNavigate, role = 'parent' }: {
           if (tab.primary) {
             return (
               <button key={tab.id} onClick={() => onNavigate?.(tab.id)} style={{
-                display: 'flex', justifyContent: 'center',
-                background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                background: 'transparent', border: 'none', padding: '6px 0', cursor: 'pointer',
+                position: 'relative',
               }}>
                 <div style={{
-                  position: 'relative', top: -18,
-                  width: 48, height: 48, borderRadius: 24,
+                  width: 44, height: 44, borderRadius: 22,
                   background: G.ink,
-                  border: `2px solid ${G.paper}`,
-                  boxShadow: '0 4px 10px rgba(27,23,19,0.25)',
+                  boxShadow: '0 2px 8px rgba(27,23,19,0.22)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>{tab.icon('#FBF7F0')}</div>
+                  position: 'relative',
+                }}>
+                  {tab.icon('#FBF7F0')}
+                  {!!tab.badge && (
+                    <div style={{
+                      position: 'absolute', top: -3, right: -3,
+                      minWidth: 16, height: 16, borderRadius: 8,
+                      background: G.clay, border: `2px solid ${G.paper}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: G.sans, fontSize: 9, fontWeight: 700, color: '#FBF7F0',
+                      padding: '0 3px',
+                    }}>{tab.badge > 9 ? '9+' : tab.badge}</div>
+                  )}
+                </div>
+                <span style={{
+                  fontFamily: G.sans, fontSize: 9.5, fontWeight: 600, letterSpacing: 0.4,
+                  textTransform: 'uppercase', color: G.ink,
+                }}>{tab.label}</span>
               </button>
             );
           }

@@ -98,7 +98,7 @@ function Rung({ ring, label, status, time, people }: {
   );
 }
 
-function BellCompose({ onRing }: { onRing: () => void }) {
+function BellCompose({ onRing, onBack }: { onRing: () => void; onBack?: () => void }) {
   const [why, setWhy] = useState(1);
   const reasons = [
     { id: 0, label: 'Sick kid',             desc: 'need someone home, now' },
@@ -111,7 +111,7 @@ function BellCompose({ onRing }: { onRing: () => void }) {
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: BELL_BG, color: G.ink }}>
       <GMasthead
         leftAction={
-          <button style={{ fontFamily: G.display, fontSize: 26, color: G.ink, lineHeight: 1, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>×</button>
+          <button onClick={onBack} style={{ fontFamily: G.display, fontSize: 26, color: G.ink, lineHeight: 1, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>×</button>
         }
         right="Ring the bell"
         title="Bell Tower"
@@ -196,11 +196,15 @@ function BellCompose({ onRing }: { onRing: () => void }) {
   );
 }
 
-function BellRinging() {
+function BellRinging({ onBack }: { onBack?: () => void }) {
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: BELL_BG, color: G.ink }}>
       <GMasthead
-        left="Ringing · 2:14 elapsed" right="Urgent"
+        leftAction={onBack ? (
+          <button onClick={onBack} style={{ fontFamily: G.display, fontSize: 26, color: G.ink, lineHeight: 1, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>×</button>
+        ) : undefined}
+        left={onBack ? undefined : "Ringing · 2:14 elapsed"}
+        right="Urgent"
         title="Kid's fever · need someone"
         titleColor={RED}
         tagline="Theo's at 102°. Sam's 40 minutes out. Widening the ring until someone can come."
@@ -359,13 +363,14 @@ function BellIncoming() {
   );
 }
 
-export function ScreenBell({ initialCompose = false, role = 'parent' }: {
+export function ScreenBell({ initialCompose = false, role = 'parent', onBack }: {
   initialCompose?: boolean;
   role?: 'parent' | 'caregiver';
+  onBack?: () => void;
 }) {
   const [mode, setMode] = useState<'compose' | 'ringing'>(initialCompose ? 'compose' : 'ringing');
   if (role === 'caregiver') return <BellIncoming />;
   return mode === 'compose'
-    ? <BellCompose onRing={() => setMode('ringing')} />
-    : <BellRinging />;
+    ? <BellCompose onRing={() => setMode('ringing')} onBack={onBack} />
+    : <BellRinging onBack={onBack} />;
 }
