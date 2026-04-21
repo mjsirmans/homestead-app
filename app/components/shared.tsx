@@ -201,50 +201,36 @@ export function GTabBar({ active = 'almanac', onNavigate, role = 'parent', bellC
       }}>
         {tabs.map(tab => {
           const isActive = active === tab.id;
-          if (tab.primary) {
-            return (
-              <button key={tab.id} onClick={() => onNavigate?.(tab.id)} style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                background: 'transparent', border: 'none', padding: '6px 0', cursor: 'pointer',
-                position: 'relative',
-              }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 22,
-                  background: G.ink,
-                  boxShadow: '0 2px 8px rgba(27,23,19,0.22)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  position: 'relative',
-                }}>
-                  {tab.icon('#FBF7F0')}
-                  {!!tab.badge && (
-                    <div style={{
-                      position: 'absolute', top: -3, right: -3,
-                      minWidth: 16, height: 16, borderRadius: 8,
-                      background: G.clay, border: `2px solid ${G.paper}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: G.sans, fontSize: 9, fontWeight: 700, color: '#FBF7F0',
-                      padding: '0 3px',
-                    }}>{tab.badge > 9 ? '9+' : tab.badge}</div>
-                  )}
-                </div>
-                <span style={{
-                  fontFamily: G.sans, fontSize: 9.5, fontWeight: 600, letterSpacing: 0.4,
-                  textTransform: 'uppercase', color: G.ink,
-                }}>{tab.label}</span>
-              </button>
-            );
-          }
+          const color = isActive ? G.ink : G.muted;
           return (
             <button key={tab.id} onClick={() => onNavigate?.(tab.id)} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              color: isActive ? G.ink : G.muted,
               background: 'transparent', border: 'none', padding: '6px 0', cursor: 'pointer',
+              position: 'relative',
             }}>
-              {tab.icon(isActive ? G.ink : G.muted)}
+              <div style={{ position: 'relative' }}>
+                {tab.icon(color)}
+                {!!tab.badge && (
+                  <div style={{
+                    position: 'absolute', top: -3, right: -3,
+                    minWidth: 14, height: 14, borderRadius: 7,
+                    background: G.clay, border: `1.5px solid ${G.paper}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: G.sans, fontSize: 8, fontWeight: 700, color: '#FBF7F0',
+                    padding: '0 2px',
+                  }}>{tab.badge > 9 ? '9+' : tab.badge}</div>
+                )}
+              </div>
               <span style={{
                 fontFamily: G.sans, fontSize: 9.5, fontWeight: 600, letterSpacing: 0.4,
-                textTransform: 'uppercase', color: isActive ? G.ink : G.muted,
+                textTransform: 'uppercase', color,
               }}>{tab.label}</span>
+              {isActive && (
+                <div style={{
+                  position: 'absolute', bottom: 3, width: 16, height: 2,
+                  borderRadius: 1, background: G.ink,
+                }} />
+              )}
             </button>
           );
         })}
