@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { households } from '@/lib/db/schema';
+import { households, users } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 
@@ -26,10 +26,28 @@ export async function GET() {
       })
     );
 
+    const validHouseholds = allHouseholds.filter(Boolean) as NonNullable<typeof allHouseholds[0]>[];
+    const hhIds = validHouseholds.map(h => h.id);
+
+    // Role of this Clerk user in each of their households
+    const myRoleRows = hhIds.length
+      ? await db.select({ householdId: users.householdId, role: users.role })
+          .from(users)
+          .where(eq(users.clerkUserId, userId!))
+      : [];
+    const rolesByHousehold: Record<string, 'parent' | 'caregiver'> = {};
+    for (const r of myRoleRows) {
+      if (hhIds.includes(r.householdId)) rolesByHousehold[r.householdId] = r.role;
+    }
+    const roles = Object.values(rolesByHousehold);
+    const isDualRole = roles.includes('parent') && roles.includes('caregiver');
+
     return NextResponse.json({
       household,
       user,
-      allHouseholds: allHouseholds.filter(Boolean),
+      allHouseholds: validHouseholds,
+      rolesByHousehold,
+      isDualRole,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

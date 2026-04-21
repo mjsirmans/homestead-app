@@ -8,7 +8,7 @@ import { ScreenShifts } from './ScreenShifts';
 import { ScreenAlmanac } from './ScreenAlmanac';
 import { ScreenBell } from './ScreenBell';
 import { ScreenVillage } from './ScreenVillage';
-import { HouseholdProvider } from './HouseholdSwitcher';
+import { HouseholdProvider, useHousehold } from './HouseholdSwitcher';
 import { InstallHint } from './InstallHint';
 import { RefreshButton } from './RefreshButton';
 
@@ -140,6 +140,7 @@ function RoleSwitcherMobile({ role, onChange }: { role: Role; onChange: (r: Role
 
 export function HomesteadApp() {
   const { user } = useUser();
+  const { isDualRole } = useHousehold();
   const canSwitchRole = !!DEV_USER_ID && user?.id === DEV_USER_ID;
 
   const [role, setRole] = useState<Role>('parent');
@@ -149,10 +150,15 @@ export function HomesteadApp() {
   const isMobile = useIsMobile();
 
   // Load real role from API; dev user may override via localStorage
+  // Dual-role users are always treated as 'parent' for tab bar purposes
   useEffect(() => {
     fetch('/api/household')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
+        if (data?.isDualRole) {
+          setRole('parent');
+          return;
+        }
         if (data?.user?.role) {
           const apiRole = data.user.role as Role;
           if (canSwitchRole) {
@@ -204,12 +210,12 @@ export function HomesteadApp() {
 
   function renderScreen() {
     switch (screen) {
-      case 'almanac': return <ScreenAlmanac role={role} onRing={handleRing} onPost={() => setScreen('post')} />;
+      case 'almanac': return <ScreenAlmanac role={role} isDualRole={isDualRole} onRing={handleRing} onPost={() => setScreen('post')} />;
       case 'post':    return <ScreenPost onCancel={() => setScreen('almanac')} onPost={handlePost} onRing={handleRing} />;
       case 'shifts':  return <ScreenShifts />;
       case 'bell':    return <ScreenBell initialCompose={true} role={role} onBack={() => setScreen('almanac')} onPost={() => setScreen('post')} />;
       case 'village': return <ScreenVillage />;
-      default:        return <ScreenAlmanac role={role} onRing={handleRing} />;
+      default:        return <ScreenAlmanac role={role} isDualRole={isDualRole} onRing={handleRing} />;
     }
   }
 

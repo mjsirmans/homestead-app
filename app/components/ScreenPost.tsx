@@ -27,7 +27,7 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
     return { start: toLocalInputValue(start), end: toLocalInputValue(end) };
   }, []);
 
-  const [title, setTitle] = useState('Evening sit');
+  const [title, setTitle] = useState('');
   const [forWhom, setForWhom] = useState('');
   const [selectedKidIds, setSelectedKidIds] = useState<string[]>([]);
   const [kids, setKids] = useState<Kid[]>([]);

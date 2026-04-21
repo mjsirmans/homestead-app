@@ -1,6 +1,8 @@
-import { pgTable, text, timestamp, uuid, pgEnum, date, unique, integer, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, pgEnum, date, unique, integer, boolean, jsonb } from 'drizzle-orm/pg-core';
 
 export const appRoleEnum = pgEnum('app_role', ['parent', 'caregiver']);
+export const bellStatusEnum = pgEnum('bell_status', ['ringing', 'handled', 'cancelled']);
+export const bellResponseEnum = pgEnum('bell_response', ['on_my_way', 'in_thirty', 'cannot']);
 export const villageGroupEnum = pgEnum('village_group', ['inner', 'family', 'sitter']);
 export const shiftStatusEnum = pgEnum('shift_status', ['open', 'claimed', 'cancelled', 'done']);
 
@@ -56,4 +58,26 @@ export const shifts = pgTable('shifts', {
   recurEndsAt: date('recur_ends_at'),
   recurOccurrences: integer('recur_occurrences'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const bells = pgTable('bells', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  householdId: uuid('household_id').notNull().references(() => households.id, { onDelete: 'cascade' }),
+  createdByUserId: uuid('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  reason: text('reason').notNull(),
+  note: text('note'),
+  startsAt: timestamp('starts_at').notNull(),
+  endsAt: timestamp('ends_at').notNull(),
+  status: bellStatusEnum('status').notNull().default('ringing'),
+  handledByUserId: uuid('handled_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  handledAt: timestamp('handled_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const bellResponses = pgTable('bell_responses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  bellId: uuid('bell_id').notNull().references(() => bells.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  response: bellResponseEnum('response').notNull(),
+  respondedAt: timestamp('responded_at').notNull().defaultNow(),
 });

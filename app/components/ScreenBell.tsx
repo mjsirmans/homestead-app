@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { G, RED, RED_DARK, BELL_BG } from './tokens';
 import { GMasthead, GLabel, GAvatar } from './shared';
 
@@ -36,10 +36,10 @@ function BellGlyph({ size = 72 }: { size?: number }) {
 
 function Person({ name, state, sub, highlight }: { name: string; state: string; sub: string; highlight?: boolean }) {
   const badge: Record<string, { color: string; mark: string }> = {
-    read:        { color: G.muted, mark: '·' },
-    coming:      { color: G.green, mark: '→' },
-    'no-answer': { color: G.clay,  mark: '×' },
-    queued:      { color: G.muted, mark: '◦' },
+    read:        { color: G.muted,  mark: '·' },
+    coming:      { color: G.green,  mark: '→' },
+    'no-answer': { color: G.clay,   mark: '×' },
+    queued:      { color: G.muted,  mark: '◦' },
   };
   const b = badge[state] || badge.queued;
   return (
@@ -108,15 +108,21 @@ function plusHours(h: number) {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
 
-function BellCompose({ onRing, onBack, onPost }: { onRing: () => void; onBack?: () => void; onPost?: () => void }) {
+type VillageMember = { id: string; name: string; villageGroup: 'inner' | 'family' | 'sitter' };
+
+function BellCompose({ onRing, onBack, onPost }: {
+  onRing: (bellId: string, label: string) => void;
+  onBack?: () => void;
+  onPost?: () => void;
+}) {
   const [why, setWhy] = useState<number | null>(null);
   const [startsAt, setStartsAt] = useState(nowLocal);
   const [endsAt, setEndsAt] = useState(() => plusHours(3));
   const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const reasons = [
     { id: 0, label: 'Sick kid',             desc: 'need someone home, now' },
     { id: 1, label: 'Last-minute conflict', desc: 'appointment, meeting, something came up' },
@@ -124,6 +130,30 @@ function BellCompose({ onRing, onBack, onPost }: { onRing: () => void; onBack?: 
     { id: 3, label: 'Emergency',            desc: "something's wrong — help" },
     { id: 4, label: 'Other',               desc: 'something else came up' },
   ];
+
+  async function handleRing() {
+    if (why === null || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/bell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: reasons[why].label,
+          note: note.trim() || undefined,
+          startsAt,
+          endsAt,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to ring bell');
+      const data = await res.json();
+      onRing(data.bell.id, reasons[why].label);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: BELL_BG, color: G.ink }}>
@@ -232,16 +262,22 @@ function BellCompose({ onRing, onBack, onPost }: { onRing: () => void; onBack?: 
           </div>
         </div>
 
-        <button onClick={onRing} disabled={why === null} style={{
+        {error && (
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: '#FFE6DA', border: `1px solid ${RED}`, fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: RED }}>
+            {error}
+          </div>
+        )}
+
+        <button onClick={handleRing} disabled={why === null || submitting} style={{
           marginTop: 22, width: '100%', padding: '18px 14px',
-          background: why === null ? G.hairline2 : RED,
-          color: why === null ? G.muted : '#FBF7F0',
+          background: why === null || submitting ? G.hairline2 : RED,
+          color: why === null || submitting ? G.muted : '#FBF7F0',
           border: 'none', borderRadius: 8,
           fontFamily: G.sans, fontSize: 13, fontWeight: 700, letterSpacing: 1.8,
-          textTransform: 'uppercase', cursor: why === null ? 'default' : 'pointer',
-          boxShadow: why === null ? 'none' : `0 4px 0 ${RED_DARK}`,
+          textTransform: 'uppercase', cursor: why === null || submitting ? 'default' : 'pointer',
+          boxShadow: why === null || submitting ? 'none' : `0 4px 0 ${RED_DARK}`,
           transition: 'background 0.15s, color 0.15s',
-        }}>Ring the Bell</button>
+        }}>{submitting ? 'Ringing…' : 'Ring the Bell'}</button>
 
         <div style={{ marginTop: 12, textAlign: 'center', fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>
           Not urgent?{' '}
@@ -256,61 +292,114 @@ function BellCompose({ onRing, onBack, onPost }: { onRing: () => void; onBack?: 
   );
 }
 
-function BellRinging({ onBack }: { onBack?: () => void }) {
+type ActiveBell = {
+  id: string;
+  reason: string;
+  note: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: 'ringing' | 'handled' | 'cancelled';
+  createdAt: string;
+  responses: { userId: string; response: string }[];
+  myResponse: string | null;
+};
+
+function BellRinging({ onBack, bellId, reason }: { onBack?: () => void; bellId?: string; reason?: string }) {
+  const [members, setMembers] = useState<VillageMember[] | null>(null);
+  const [marking, setMarking] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/village')
+      .then(r => r.ok ? r.json() : { adults: [] })
+      .then(d => setMembers((d.adults as VillageMember[]) || []))
+      .catch(() => setMembers([]));
+  }, []);
+
+  const byGroup = (g: 'inner' | 'family' | 'sitter') =>
+    (members || []).filter(m => m.villageGroup === g);
+
+  const inner  = byGroup('inner');
+  const family = byGroup('family');
+  const sitter = byGroup('sitter');
+
+  async function handleMarkDone() {
+    if (!bellId || marking) return;
+    setMarking(true);
+    await fetch(`/api/bell/${bellId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'handled' }),
+    }).catch(() => {});
+    onBack?.();
+  }
+
+  async function handleCancel() {
+    if (!confirm('Cancel the bell? Everyone who was notified will receive a cancellation message.')) return;
+    if (bellId) {
+      await fetch(`/api/bell/${bellId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' }),
+      }).catch(() => {});
+    }
+    onBack?.();
+  }
+
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: BELL_BG, color: G.ink }}>
       <GMasthead
         leftAction={onBack ? (
           <button onClick={onBack} style={{ fontFamily: G.display, fontSize: 26, color: G.ink, lineHeight: 1, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>×</button>
         ) : undefined}
-        left={onBack ? undefined : "Ringing · 2:14 elapsed"}
         right="Urgent"
-        title="Kid's fever · need someone"
+        title={reason || 'Bell ringing'}
         titleColor={RED}
-        tagline="Theo's at 102°. Sam's 40 minutes out. Widening the ring until someone can come."
-        folioLeft="No. 142" folioRight="Urgent edition"
+        tagline="Your village is being notified — inner circle first, widening if no one answers."
+        folioLeft="Live" folioRight="Urgent edition"
       />
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px 120px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 18px' }}>
           <BellGlyph size={72} />
         </div>
 
-        <GLabel color={G.ink}>Who&apos;s Been Called</GLabel>
-        <div style={{ marginTop: 10, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 14, top: 12, bottom: 12, width: 1, background: G.hairline2 }} />
-          <Rung ring={1} label="Inner Circle" status="rung" time="2:14 ago"
-            people={[
-              { name: 'Ruth P.', state: 'read',   sub: 'read · no reply' },
-              { name: 'Mae L.',  state: 'read',   sub: 'read · no reply' },
-              { name: 'Sam P.',  state: 'coming', sub: '40 min away · on the way' },
-            ]} />
-          <Rung ring={2} label="Family + close friends" status="rung" time="1:12 ago"
-            people={[
-              { name: 'Omar K.', state: 'coming',    sub: '15 min · leaving now', highlight: true },
-              { name: 'Jen R.',  state: 'read',      sub: 'read · at work' },
-              { name: 'Dad',     state: 'no-answer', sub: 'no answer' },
-            ]} />
-          <Rung ring={3} label="Trusted sitters" status="queued" time="starts at 3:00"
-            people={[
-              { name: 'Priya S.', state: 'queued', sub: 'not yet rung' },
-              { name: 'Ben T.',   state: 'queued', sub: 'not yet rung' },
-            ]} />
-          <Rung ring={4} label="Whole village" status="pending" time="final · if no one by 4:00" people={[]} />
-        </div>
+        {members === null ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 13 }}>
+            Loading your village…
+          </div>
+        ) : members.length === 0 ? (
+          <div style={{
+            padding: '18px 16px', borderRadius: 8, border: `1px dashed ${RED}`,
+            background: '#FFF0E8', marginTop: 8,
+            fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.ink2, lineHeight: 1.5,
+          }}>
+            No one in your village yet. Add caregivers from the Village tab so they can receive bell alerts.
+          </div>
+        ) : (
+          <>
+            <GLabel color={G.ink}>Who&apos;s Being Called</GLabel>
+            <div style={{ marginTop: 10, position: 'relative' }}>
+              <div style={{ position: 'absolute', left: 14, top: 12, bottom: 12, width: 1, background: G.hairline2 }} />
+              <Rung ring={1} label="Inner Circle" status={inner.length > 0 ? 'rung' : 'pending'} time="Now"
+                people={inner.map(m => ({ name: m.name, state: 'queued', sub: 'notified' }))} />
+              <Rung ring={2} label="Family & close friends" status={family.length > 0 ? 'queued' : 'pending'} time="+2 min if no answer"
+                people={family.map(m => ({ name: m.name, state: 'queued', sub: 'standing by' }))} />
+              <Rung ring={3} label="Trusted sitters" status={sitter.length > 0 ? 'queued' : 'pending'} time="+5 min"
+                people={sitter.map(m => ({ name: m.name, state: 'queued', sub: 'standing by' }))} />
+              <Rung ring={4} label="Whole village" status="pending" time="+10 min · last resort" people={[]} />
+            </div>
+          </>
+        )}
 
-        <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button onClick={onBack} style={{
+        <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={handleMarkDone} disabled={marking} style={{
             width: '100%', padding: '14px 12px',
             background: G.ink, color: '#FBF7F0',
             border: 'none', borderRadius: 8,
             fontFamily: G.sans, fontSize: 11, fontWeight: 700, letterSpacing: 1.4,
-            textTransform: 'uppercase', cursor: 'pointer',
+            textTransform: 'uppercase', cursor: marking ? 'wait' : 'pointer',
+            opacity: marking ? 0.6 : 1,
           }}>Someone is on the way · Mark handled</button>
-          <button onClick={() => {
-            if (confirm('Cancel the bell? Everyone who was notified will receive a cancellation message.')) {
-              onBack?.();
-            }
-          }} style={{
+          <button onClick={handleCancel} style={{
             width: '100%', padding: '12px 12px',
             background: 'transparent', color: G.muted,
             border: `1px solid ${G.hairline2}`, borderRadius: 8,
@@ -324,95 +413,163 @@ function BellRinging({ onBack }: { onBack?: () => void }) {
 }
 
 function BellIncoming() {
-  const [answered, setAnswered] = useState<'yes' | 'later' | 'no' | null>(null);
+  const [bells, setBells] = useState<ActiveBell[] | null>(null);
+  const [responding, setResponding] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/bell/active');
+      if (!res.ok) return;
+      const data = await res.json();
+      setBells(data.bells || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  async function respond(bellId: string, response: 'on_my_way' | 'in_thirty' | 'cannot') {
+    setResponding(bellId + response);
+    await fetch(`/api/bell/${bellId}/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response }),
+    }).catch(() => {});
+    await load();
+    setResponding(null);
+  }
+
+  const activeBells = (bells || []).filter(b => b.status === 'ringing');
+
+  if (bells === null) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BELL_BG }}>
+        <div style={{ fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 13 }}>Checking for bells…</div>
+      </div>
+    );
+  }
+
+  if (activeBells.length === 0) {
+    return (
+      <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: BELL_BG, color: G.ink }}>
+        <GMasthead
+          left="Bell" right="Incoming"
+          title="All clear"
+          titleColor={G.ink}
+          tagline="No bells ringing right now. You'll see alerts here when a family needs help."
+          folioLeft="No alerts" folioRight="Standing by"
+        />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ textAlign: 'center' }}>
+            <BellGlyph size={48} />
+            <div style={{ marginTop: 16, fontFamily: G.serif, fontStyle: 'italic', fontSize: 14, color: G.muted, lineHeight: 1.6 }}>
+              When someone rings the bell,<br />it will appear here.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: BELL_BG, color: G.ink }}>
       <GMasthead
         left="Incoming · now" right="Urgent"
-        title="The Parks are ringing"
+        title={activeBells.length === 1 ? activeBells[0].reason : `${activeBells.length} bells ringing`}
         titleColor={RED}
-        tagline="Sarah rang the bell 14 seconds ago. Inner circle — you're first."
-        folioLeft="No. 142" folioRight="Urgent edition"
+        tagline="Someone in your village needs help. Inner circle — you're first."
+        folioLeft="Live" folioRight="Urgent edition"
       />
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px 120px' }}>
-        <div style={{
-          background: G.paper, border: `1px solid ${RED}`, borderRadius: 10,
-          padding: 18, marginTop: 8, position: 'relative',
-          boxShadow: '0 8px 24px rgba(181,52,43,0.12)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <GAvatar name="Sarah Park" size={44} />
-            <div>
-              <div style={{ fontFamily: G.display, fontSize: 18, fontWeight: 500, color: G.ink, lineHeight: 1.1 }}>Sarah Park</div>
-              <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted, marginTop: 2 }}>
-                Nora &amp; Finn&apos;s mom · 12 min away
+        {activeBells.map(bell => {
+          const myResp = bell.myResponse;
+          const rungAt = new Date(bell.createdAt);
+          const secondsAgo = Math.floor((Date.now() - rungAt.getTime()) / 1000);
+          const timeAgo = secondsAgo < 60 ? `${secondsAgo}s ago` : `${Math.floor(secondsAgo / 60)}m ago`;
+
+          return (
+            <div key={bell.id} style={{
+              background: G.paper, border: `1px solid ${RED}`, borderRadius: 10,
+              padding: 18, marginTop: 8, position: 'relative',
+              boxShadow: '0 8px 24px rgba(181,52,43,0.12)',
+              marginBottom: 16,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                <GLabel color={RED}>What&apos;s happening</GLabel>
+                <span style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 11, color: G.muted }}>{timeAgo}</span>
               </div>
-            </div>
-          </div>
-          <GLabel color={RED}>What&apos;s happening</GLabel>
-          <div style={{ fontFamily: G.display, fontSize: 20, fontWeight: 500, color: G.ink, marginTop: 6, lineHeight: 1.2 }}>
-            Finn has a fever · need someone home
-          </div>
-          <div style={{ fontFamily: G.serif, fontStyle: 'italic', color: G.ink2, fontSize: 13, marginTop: 6, lineHeight: 1.4 }}>
-            &ldquo;He&apos;s at 101.5. Sam&apos;s 40 min out and I&apos;m in a deposition. Anyone close by?&rdquo;
-          </div>
-          <div style={{ height: 1, background: G.hairline, margin: '16px 0' }} />
-          <div style={{ display: 'flex', gap: 20, fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>
-            <div><strong style={{ fontStyle: 'normal', color: G.ink }}>412 Oak St.</strong> · ~8 min from you</div>
-          </div>
-          <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted, marginTop: 4 }}>
-            Likely 2–3 hours until Sam is home.
-          </div>
-        </div>
+              <div style={{ fontFamily: G.display, fontSize: 20, fontWeight: 500, color: G.ink, lineHeight: 1.2 }}>
+                {bell.reason}
+              </div>
+              {bell.note && (
+                <div style={{ fontFamily: G.serif, fontStyle: 'italic', color: G.ink2, fontSize: 13, marginTop: 6, lineHeight: 1.4 }}>
+                  &ldquo;{bell.note}&rdquo;
+                </div>
+              )}
+              <div style={{ height: 1, background: G.hairline, margin: '14px 0' }} />
+              <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>
+                Needed from {new Date(bell.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} until {new Date(bell.endsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </div>
 
-        {!answered && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
-            <button onClick={() => setAnswered('yes')} style={{
-              padding: '14px 18px', background: RED, color: '#FFF',
-              border: 'none', borderRadius: 8,
-              fontFamily: G.sans, fontSize: 12, fontWeight: 700, letterSpacing: 1.5,
-              textTransform: 'uppercase', cursor: 'pointer',
-              boxShadow: `0 4px 0 ${RED_DARK}`,
-            }}>I&apos;m on my way</button>
-            <button onClick={() => setAnswered('later')} style={{
-              padding: '12px 18px', background: 'transparent', color: G.ink,
-              border: `1px solid ${G.hairline2}`, borderRadius: 8,
-              fontFamily: G.sans, fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
-              textTransform: 'uppercase', cursor: 'pointer',
-            }}>Could in 30 min</button>
-            <button onClick={() => setAnswered('no')} style={{
-              padding: '10px 18px', background: 'transparent', color: G.muted, border: 'none',
-              fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, cursor: 'pointer',
-            }}>Can&apos;t — pass to next circle</button>
-          </div>
-        )}
-
-        {answered === 'yes' && (
-          <div style={{ marginTop: 18, padding: 18, background: G.paper, border: `1px solid ${G.green}`, borderRadius: 10, textAlign: 'center' }}>
-            <GLabel color={G.green}>Answered · on your way</GLabel>
-            <div style={{ fontFamily: G.display, fontStyle: 'italic', fontSize: 22, color: G.ink, marginTop: 8, lineHeight: 1.2 }}>
-              Sarah&apos;s been told.
+              {!myResp ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+                  <button
+                    onClick={() => respond(bell.id, 'on_my_way')}
+                    disabled={responding !== null}
+                    style={{
+                      padding: '14px 18px', background: RED, color: '#FFF',
+                      border: 'none', borderRadius: 8,
+                      fontFamily: G.sans, fontSize: 12, fontWeight: 700, letterSpacing: 1.5,
+                      textTransform: 'uppercase', cursor: 'pointer',
+                      boxShadow: `0 4px 0 ${RED_DARK}`,
+                      opacity: responding ? 0.7 : 1,
+                    }}>I&apos;m on my way</button>
+                  <button
+                    onClick={() => respond(bell.id, 'in_thirty')}
+                    disabled={responding !== null}
+                    style={{
+                      padding: '12px 18px', background: 'transparent', color: G.ink,
+                      border: `1px solid ${G.hairline2}`, borderRadius: 8,
+                      fontFamily: G.sans, fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
+                      textTransform: 'uppercase', cursor: 'pointer',
+                      opacity: responding ? 0.7 : 1,
+                    }}>Could in 30 min</button>
+                  <button
+                    onClick={() => respond(bell.id, 'cannot')}
+                    disabled={responding !== null}
+                    style={{
+                      padding: '10px 18px', background: 'transparent', color: G.muted, border: 'none',
+                      fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, cursor: 'pointer',
+                      opacity: responding ? 0.7 : 1,
+                    }}>Can&apos;t — pass to next circle</button>
+                </div>
+              ) : myResp === 'on_my_way' ? (
+                <div style={{ marginTop: 14, padding: 14, background: G.paper, border: `1px solid ${G.green}`, borderRadius: 10, textAlign: 'center' }}>
+                  <GLabel color={G.green}>Answered · on your way</GLabel>
+                  <div style={{ fontFamily: G.display, fontStyle: 'italic', fontSize: 18, color: G.ink, marginTop: 8, lineHeight: 1.2 }}>
+                    They&apos;ve been told.
+                  </div>
+                </div>
+              ) : myResp === 'in_thirty' ? (
+                <div style={{ marginTop: 14, padding: 14, background: G.paper, border: `1px solid ${G.hairline2}`, borderRadius: 10, textAlign: 'center' }}>
+                  <GLabel>Offered · in 30 min</GLabel>
+                  <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.ink2, marginTop: 8, lineHeight: 1.4 }}>
+                    They were told. They&apos;ll keep ringing for sooner — but if nobody else can, you&apos;ll hear back.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: 14, padding: 14, background: 'transparent', border: `1px dashed ${G.hairline2}`, borderRadius: 10, textAlign: 'center' }}>
+                  <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.muted, lineHeight: 1.4 }}>
+                    Passed to the next circle. No guilt — that&apos;s how the bell works.
+                  </div>
+                </div>
+              )}
             </div>
-            <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.ink2, marginTop: 6 }}>
-              Directions sent to your phone. Drive safe.
-            </div>
-          </div>
-        )}
-        {answered === 'later' && (
-          <div style={{ marginTop: 18, padding: 18, background: G.paper, border: `1px solid ${G.hairline2}`, borderRadius: 10, textAlign: 'center' }}>
-            <GLabel>Offered · in 30 min</GLabel>
-            <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.ink2, marginTop: 8, lineHeight: 1.4 }}>
-              Sarah was told. She&apos;ll keep ringing others for sooner — but if nobody else can, you&apos;ll hear back.
-            </div>
-          </div>
-        )}
-        {answered === 'no' && (
-          <div style={{ marginTop: 18, padding: 18, background: 'transparent', border: `1px dashed ${G.hairline2}`, borderRadius: 10, textAlign: 'center' }}>
-            <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.muted, lineHeight: 1.4 }}>
-              Passed to the next circle. No guilt — that&apos;s how the bell works.
-            </div>
-          </div>
-        )}
+          );
+        })}
 
         <div style={{
           margin: '28px 4px 8px', padding: '18px 16px',
@@ -435,8 +592,16 @@ export function ScreenBell({ initialCompose = false, role = 'parent', onBack, on
   onPost?: () => void;
 }) {
   const [mode, setMode] = useState<'compose' | 'ringing'>(initialCompose ? 'compose' : 'ringing');
+  const [ringReason, setRingReason] = useState('');
+  const [ringBellId, setRingBellId] = useState<string | undefined>();
+
   if (role === 'caregiver') return <BellIncoming />;
+
   return mode === 'compose'
-    ? <BellCompose onRing={() => setMode('ringing')} onBack={onBack} onPost={onPost} />
-    : <BellRinging onBack={onBack} />;
+    ? <BellCompose
+        onRing={(bellId, label) => { setRingBellId(bellId); setRingReason(label); setMode('ringing'); }}
+        onBack={onBack}
+        onPost={onPost}
+      />
+    : <BellRinging onBack={onBack} bellId={ringBellId} reason={ringReason} />;
 }

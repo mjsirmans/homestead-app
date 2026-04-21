@@ -201,12 +201,13 @@ function BellButton({ onRing }: { onRing: () => void }) {
   );
 }
 
-export function ScreenAlmanac({ role = 'parent', onRing, onPost }: {
+export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onPost }: {
   role?: 'parent' | 'caregiver';
+  isDualRole?: boolean;
   onRing?: () => void;
   onPost?: () => void;
 }) {
-  const { active, all } = useHousehold();
+  const { active, all, rolesByHousehold } = useHousehold();
   const multiHousehold = all.length > 1;
   const [rows, setRows] = useState<ShiftRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -216,7 +217,8 @@ export function ScreenAlmanac({ role = 'parent', onRing, onPost }: {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const scope = multiHousehold ? 'all' : role === 'caregiver' ? 'village' : 'household';
+      // Dual-role and multi-household users always get the unified scope
+      const scope = (isDualRole || multiHousehold) ? 'all' : role === 'caregiver' ? 'village' : 'household';
       const res = await fetch(`/api/shifts?scope=${scope}`);
       if (!res.ok) throw new Error(`Failed (${res.status})`);
       const data = await res.json() as { shifts: ShiftRow[] };
@@ -225,7 +227,7 @@ export function ScreenAlmanac({ role = 'parent', onRing, onPost }: {
       setError(err instanceof Error ? err.message : 'Failed to load');
       setRows([]);
     }
-  }, [role, multiHousehold]);
+  }, [role, isDualRole, multiHousehold]);
 
   useEffect(() => { load(); }, [load, active?.id]);
 
@@ -262,22 +264,49 @@ export function ScreenAlmanac({ role = 'parent', onRing, onPost }: {
   }
 
   const upcoming = (rows || []).filter(r => new Date(r.shift.endsAt) >= new Date());
-  const today    = upcoming.filter(r => bucketOf(r.shift.startsAt) === 'today');
-  const tomorrow = upcoming.filter(r => bucketOf(r.shift.startsAt) === 'tomorrow');
-  const week     = upcoming.filter(r => bucketOf(r.shift.startsAt) === 'week');
-  const later    = upcoming.filter(r => bucketOf(r.shift.startsAt) === 'later');
+
+  // Dual-role split: own household vs other families needing help
+  const myHouseholdId = active?.id;
+  const ownShifts = isDualRole
+    ? upcoming.filter(r => r.shift.householdId === myHouseholdId)
+    : upcoming;
+  const helpNeeded = isDualRole
+    ? upcoming.filter(r => r.shift.householdId !== myHouseholdId && r.shift.status === 'open' && !r.claimedByMe)
+    : [];
+  const myCaregiverClaimed = isDualRole
+    ? upcoming.filter(r => r.shift.householdId !== myHouseholdId && r.claimedByMe)
+    : [];
+
+  const today    = ownShifts.filter(r => bucketOf(r.shift.startsAt) === 'today');
+  const tomorrow = ownShifts.filter(r => bucketOf(r.shift.startsAt) === 'tomorrow');
+  const week     = ownShifts.filter(r => bucketOf(r.shift.startsAt) === 'week');
+  const later    = ownShifts.filter(r => bucketOf(r.shift.startsAt) === 'later');
 
   function possessive(name: string) {
     return name.endsWith('s') ? `${name}'` : `${name}'s`;
   }
   const title = role === 'caregiver' ? 'My Schedule' : (active?.name ? `${possessive(active.name)} Almanac` : 'The Almanac');
-  const tagline = rows === null ? 'Loading…'
-    : upcoming.length === 0 ? 'Nothing on the books yet.'
-    : multiHousehold
-      ? `${upcoming.filter(r => r.shift.status === 'open').length} open · ${upcoming.filter(r => r.claimedByMe).length} you're covering.`
-      : role === 'parent'
-        ? `${upcoming.filter(r => r.shift.status === 'claimed').length} claimed · ${upcoming.filter(r => r.shift.status === 'open').length} still open.`
-        : `${upcoming.filter(r => r.claimedByMe).length} shifts you're covering.`;
+
+  let tagline = 'Loading…';
+  if (rows !== null) {
+    if (isDualRole) {
+      const parts = [
+        ownShifts.filter(r => r.shift.status === 'open').length > 0
+          ? `${ownShifts.filter(r => r.shift.status === 'open').length} open in your household` : null,
+        myCaregiverClaimed.length > 0 ? `${myCaregiverClaimed.length} you're covering` : null,
+        helpNeeded.length > 0 ? `${helpNeeded.length} available to help with` : null,
+      ].filter(Boolean);
+      tagline = parts.length ? parts.join(' · ') : 'All covered.';
+    } else if (upcoming.length === 0) {
+      tagline = 'Nothing on the books yet.';
+    } else if (multiHousehold) {
+      tagline = `${upcoming.filter(r => r.shift.status === 'open').length} open · ${upcoming.filter(r => r.claimedByMe).length} you're covering.`;
+    } else if (role === 'parent') {
+      tagline = `${upcoming.filter(r => r.shift.status === 'claimed').length} claimed · ${upcoming.filter(r => r.shift.status === 'open').length} still open.`;
+    } else {
+      tagline = `${upcoming.filter(r => r.claimedByMe).length} shifts you're covering.`;
+    }
+  }
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
@@ -303,7 +332,9 @@ export function ScreenAlmanac({ role = 'parent', onRing, onPost }: {
             Loading your schedule…
           </div>
         )}
-        {rows && upcoming.length === 0 && <EmptyAlmanac onRing={onRing} onPost={onPost} role={role} />}
+        {rows && ownShifts.length === 0 && helpNeeded.length === 0 && myCaregiverClaimed.length === 0 && (
+          <EmptyAlmanac onRing={onRing} onPost={onPost} role={role} />
+        )}
 
         {today.length > 0 && <>
           <SectionHead label="Today" />
@@ -368,6 +399,48 @@ export function ScreenAlmanac({ role = 'parent', onRing, onPost }: {
             />
           ))}
         </>}
+
+        {/* ── Dual-role: shifts from families the user helps with ── */}
+        {isDualRole && (myCaregiverClaimed.length > 0 || helpNeeded.length > 0) && (
+          <>
+            <div style={{
+              margin: '24px 0 0',
+              padding: '14px 0 10px',
+              borderTop: `1px solid ${G.ink}`,
+            }}>
+              <GLabel color={G.ink}>Also helping with</GLabel>
+              <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted, marginTop: 2 }}>
+                Open requests from other families in your village
+              </div>
+            </div>
+
+            {myCaregiverClaimed.length > 0 && <>
+              <SectionHead label="You're covering" />
+              {myCaregiverClaimed.map(r => (
+                <ShiftCard
+                  key={r.shift.id} row={r}
+                  accent={G.green}
+                  tagline={`Covering · ${r.household?.name ?? 'another family'}`}
+                  showHousehold={true}
+                />
+              ))}
+            </>}
+
+            {helpNeeded.length > 0 && <>
+              <SectionHead label="Available to help" />
+              {helpNeeded.map(r => (
+                <ShiftCard
+                  key={r.shift.id} row={r}
+                  accent={G.clay}
+                  tagline={`Open · ${r.household?.name ?? 'another family'}`}
+                  onClaim={claimShift}
+                  claiming={claimingId === r.shift.id}
+                  showHousehold={true}
+                />
+              ))}
+            </>}
+          </>
+        )}
       </div>
     </div>
   );

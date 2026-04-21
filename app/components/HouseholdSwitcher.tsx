@@ -21,9 +21,14 @@ type Ctx = {
   active: HouseholdSummary | null;
   all: HouseholdSummary[];
   refresh: () => Promise<void>;
+  isDualRole: boolean;
+  rolesByHousehold: Record<string, 'parent' | 'caregiver'>;
 };
 
-const HouseholdContext = createContext<Ctx>({ active: null, all: [], refresh: async () => {} });
+const HouseholdContext = createContext<Ctx>({
+  active: null, all: [], refresh: async () => {},
+  isDualRole: false, rolesByHousehold: {},
+});
 
 export function useHousehold() {
   return useContext(HouseholdContext);
@@ -31,13 +36,22 @@ export function useHousehold() {
 
 export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const [all, setAll] = useState<HouseholdSummary[]>([]);
+  const [isDualRole, setIsDualRole] = useState(false);
+  const [rolesByHousehold, setRolesByHousehold] = useState<Record<string, 'parent' | 'caregiver'>>({});
 
   const refresh = useCallback(async () => {
     try {
       const res = await fetch('/api/household');
       if (!res.ok) return;
-      const data = await res.json() as { household?: ActiveHouseholdDetails; allHouseholds?: HouseholdSummary[] };
+      const data = await res.json() as {
+        household?: ActiveHouseholdDetails;
+        allHouseholds?: HouseholdSummary[];
+        isDualRole?: boolean;
+        rolesByHousehold?: Record<string, 'parent' | 'caregiver'>;
+      };
       setAll(data.allHouseholds || []);
+      setIsDualRole(data.isDualRole ?? false);
+      setRolesByHousehold(data.rolesByHousehold ?? {});
       if (data.household && !data.household.setupCompleteAt && typeof window !== 'undefined') {
         if (window.location.pathname !== '/setup') {
           window.location.replace('/setup');
@@ -51,7 +65,7 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const active = all.find(h => h.active) ?? null;
 
   return (
-    <HouseholdContext.Provider value={{ active, all, refresh }}>
+    <HouseholdContext.Provider value={{ active, all, refresh, isDualRole, rolesByHousehold }}>
       {children}
     </HouseholdContext.Provider>
   );
