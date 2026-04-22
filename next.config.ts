@@ -8,6 +8,27 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
     NEXT_PUBLIC_APP_SHA: sha,
   },
+  async headers() {
+    return [
+      {
+        // HTML pages — never cache; always revalidate so iOS PWA picks up new deploys
+        source: '/((?!_next/static|_next/image|favicon|icon|manifest).*)',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Pragma',        value: 'no-cache' },
+          { key: 'Expires',       value: '0' },
+        ],
+      },
+      {
+        // Service worker must never be cached — browser needs to check for updates
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
