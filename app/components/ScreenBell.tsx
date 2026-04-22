@@ -92,7 +92,7 @@ function Rung({ ring, label, status, time, people }: {
         </div>
         {people.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {people.map((p, i) => <Person key={i} {...p} />)}
+            {people.map((p) => <Person key={p.name} {...p} />)}
           </div>
         )}
       </div>
