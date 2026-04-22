@@ -129,9 +129,8 @@ export function ScreenSettings({ onBack }: { onBack?: () => void }) {
             Delete my data
           </div>
           <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.ink2, marginTop: 6, lineHeight: 1.5 }}>
-            Permanently removes your profile data, push subscriptions, availability blocks, and pending invites.
-            Shifts and bells created by you are kept in household history but your name is replaced with
-            &ldquo;[deleted]&rdquo;. To also close your login, delete your Clerk account from the user menu.
+            Permanently removes your profile, push subscriptions, availability blocks, and pending invites.
+            Future shifts you created are cancelled. Your Clerk login is also deleted — you will be signed out immediately.
           </div>
 
           {deletingState === 'idle' && (
@@ -140,7 +139,7 @@ export function ScreenSettings({ onBack }: { onBack?: () => void }) {
               background: 'transparent', color: G.clay, border: `1px solid ${G.clay}`,
               fontFamily: G.sans, fontSize: 11, fontWeight: 700, letterSpacing: 1.3,
               textTransform: 'uppercase', cursor: 'pointer',
-            }}>Delete my data</button>
+            }}>Delete my account</button>
           )}
 
           {deletingState === 'confirming' && (
@@ -175,7 +174,7 @@ export function ScreenSettings({ onBack }: { onBack?: () => void }) {
             <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: G.paper, border: `1px solid ${G.green}` }}>
               <div style={{ fontFamily: G.display, fontSize: 14, color: G.green, fontWeight: 500 }}>Your data has been deleted.</div>
               <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.ink2, marginTop: 4 }}>
-                Sign out from the profile menu to finish.
+                Signing you out…
               </div>
             </div>
           )}

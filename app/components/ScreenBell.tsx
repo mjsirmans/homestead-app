@@ -358,6 +358,7 @@ type ActiveBell = {
 function BellRinging({ onBack, bellId, reason }: { onBack?: () => void; bellId?: string; reason?: string }) {
   const [members, setMembers] = useState<VillageMember[] | null>(null);
   const [marking, setMarking] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   useEffect(() => {
     fetch('/api/village')
@@ -385,7 +386,8 @@ function BellRinging({ onBack, bellId, reason }: { onBack?: () => void; bellId?:
   }
 
   async function handleCancel() {
-    if (!confirm('Cancel the bell? Everyone who was notified will receive a cancellation message.')) return;
+    if (!confirmingCancel) { setConfirmingCancel(true); return; }
+    setConfirmingCancel(false);
     if (bellId) {
       await fetch(`/api/bell/${bellId}`, {
         method: 'PATCH',
@@ -450,13 +452,30 @@ function BellRinging({ onBack, bellId, reason }: { onBack?: () => void; bellId?:
             textTransform: 'uppercase', cursor: marking ? 'wait' : 'pointer',
             opacity: marking ? 0.6 : 1,
           }}>Someone is on the way · Mark handled</button>
-          <button onClick={handleCancel} style={{
-            width: '100%', padding: '12px 12px',
-            background: 'transparent', color: G.muted,
-            border: `1px solid ${G.hairline2}`, borderRadius: 8,
-            fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-            textTransform: 'uppercase', cursor: 'pointer',
-          }}>Cancel bell · notify everyone</button>
+          {confirmingCancel ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleCancel} style={{
+                flex: 1, padding: '12px 12px',
+                background: RED, color: '#FBF7F0', border: 'none', borderRadius: 8,
+                fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+                textTransform: 'uppercase', cursor: 'pointer',
+              }}>Yes, cancel bell</button>
+              <button onClick={() => setConfirmingCancel(false)} style={{
+                flex: 1, padding: '12px 12px',
+                background: 'transparent', color: G.ink, border: `1px solid ${G.hairline2}`, borderRadius: 8,
+                fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+                textTransform: 'uppercase', cursor: 'pointer',
+              }}>Keep ringing</button>
+            </div>
+          ) : (
+            <button onClick={handleCancel} style={{
+              width: '100%', padding: '12px 12px',
+              background: 'transparent', color: G.muted,
+              border: `1px solid ${G.hairline2}`, borderRadius: 8,
+              fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+              textTransform: 'uppercase', cursor: 'pointer',
+            }}>Cancel bell · notify everyone</button>
+          )}
         </div>
       </div>
     </div>

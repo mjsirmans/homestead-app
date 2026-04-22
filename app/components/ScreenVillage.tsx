@@ -834,11 +834,11 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
       }
     };
     if (isTouch) {
-      longPressTimer.current = setTimeout(activate, 220);
+      longPressTimer.current = setTimeout(activate, 300);
       // If user moves before long-press fires, cancel (treat as scroll)
       const onEarlyMove = (me: PointerEvent) => {
         const dx = Math.abs(me.clientX - startX), dy = Math.abs(me.clientY - startY);
-        if (dx > 8 || dy > 8) {
+        if (dx > 12 || dy > 12) {
           if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
           dragStateRef.current = null;
           window.removeEventListener('pointermove', onEarlyMove);
