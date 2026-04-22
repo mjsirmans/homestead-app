@@ -10,6 +10,31 @@
  * The same logic runs server-side in API normalisation and client-side for
  * display consistency. Keep them in sync.
  */
+/**
+ * Normalize a raw name value from the DB (possibly an email or slug) into a
+ * full display name. Does NOT truncate to initials — that's shortName's job.
+ * Use this server-side before returning data to the client.
+ */
+export function normaliseStoredName(stored: string): string {
+  const trimmed = stored.trim();
+  if (!trimmed) return '';
+  if (trimmed.includes('@')) {
+    const local = trimmed.split('@')[0];
+    return local.split(/[._]/).filter(Boolean)
+      .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(' ');
+  }
+  if (!trimmed.includes(' ') && /[._]/.test(trimmed)) {
+    return trimmed.split(/[._]/).filter(Boolean)
+      .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(' ');
+  }
+  if (!trimmed.includes(' ') && trimmed === trimmed.toLowerCase()) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+  return trimmed;
+}
+
 export function shortName(full: string): string {
   const trimmed = full.trim();
   if (!trimmed) return '';

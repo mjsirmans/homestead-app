@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { users, kids, households } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
+import { normaliseStoredName } from '@/lib/format';
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,16 +24,9 @@ export async function GET(req: NextRequest) {
         db.select().from(kids).where(inArray(kids.householdId, hhIds)),
       ]);
 
-      const normaliseName = (n: string) => {
-        if (n.includes('@')) return n.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        if (!n.includes(' ') && /[._]/.test(n)) return n.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        if (!n.includes(' ') && n === n.toLowerCase()) return n.charAt(0).toUpperCase() + n.slice(1);
-        return n;
-      };
-
       const families = hhRows.map(h => ({
         household: { id: h.id, name: h.name, glyph: h.glyph },
-        adults: allAdults.filter(a => a.householdId === h.id).map(a => ({ ...a, name: normaliseName(a.name) })),
+        adults: allAdults.filter(a => a.householdId === h.id).map(a => ({ ...a, name: normaliseStoredName(a.name) })),
         kids: allKids.filter(k => k.householdId === h.id),
       }));
 
@@ -45,13 +39,7 @@ export async function GET(req: NextRequest) {
       db.select().from(kids).where(eq(kids.householdId, household.id)),
     ]);
 
-    const normName = (n: string) => {
-      if (n.includes('@')) return n.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      if (!n.includes(' ') && /[._]/.test(n)) return n.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      if (!n.includes(' ') && n === n.toLowerCase()) return n.charAt(0).toUpperCase() + n.slice(1);
-      return n;
-    };
-    const normalised = adults.map(a => ({ ...a, name: normName(a.name) }));
+    const normalised = adults.map(a => ({ ...a, name: normaliseStoredName(a.name) }));
     return NextResponse.json({ adults: normalised, kids: kidsList });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
