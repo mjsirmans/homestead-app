@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { requireHousehold } from '@/lib/auth/household';
-
+import { apiError } from '@/lib/api-error';
 export async function POST(req: NextRequest) {
   try {
     const { userId, orgId } = await auth();
@@ -63,7 +63,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'mode must be "email" or "link"' }, { status: 400 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Invite failed', 500, 'village:invite');
   }
 }

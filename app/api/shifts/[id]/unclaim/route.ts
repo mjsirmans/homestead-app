@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { shifts, users } from '@/lib/db/schema';
-
+import { apiError } from '@/lib/api-error';
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
@@ -29,7 +29,6 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
 
     return NextResponse.json({ shift: released });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Could not unclaim shift', 500, 'shifts:unclaim');
   }
 }

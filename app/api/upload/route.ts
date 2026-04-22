@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import { users, kids } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
 import { stripExif } from '@/lib/strip-exif';
-
+import { apiError } from '@/lib/api-error';
 export async function POST(req: NextRequest) {
   try {
     const { household, user } = await requireHousehold();
@@ -55,7 +55,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Upload failed', 500, 'upload');
   }
 }

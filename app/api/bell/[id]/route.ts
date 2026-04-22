@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { bells } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
-
+import { apiError } from '@/lib/api-error';
 // PATCH /api/bell/[id] — { status: 'handled' | 'cancelled' }
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -24,7 +24,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await db.update(bells).set(updates).where(eq(bells.id, bellId));
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Bell action failed', 500, 'bell:id');
   }
 }

@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel, SectionHead, Icons } from './shared';
 import { HouseholdSwitcher, useHousehold } from './HouseholdSwitcher';
+import { shortName } from '@/lib/format';
 
 type UnavailRow = {
   id: string;
@@ -221,7 +222,7 @@ function ShiftDetailSheet({ row, onClose, onClaim, claiming, canClaim }: {
         {row.creator && (
           <div style={{ marginTop: 14 }}>
             <GLabel>Posted by</GLabel>
-            <div style={{ fontFamily: G.serif, fontSize: 14, color: G.ink, marginTop: 2 }}>{row.creator.name.split(' ')[0]}</div>
+            <div style={{ fontFamily: G.serif, fontSize: 14, color: G.ink, marginTop: 2 }}>{shortName(row.creator.name)}</div>
           </div>
         )}
         <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
@@ -356,7 +357,13 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
       // Dual-role and multi-household users always get the unified scope
       const scope = (isDualRole || multiHousehold) ? 'all' : role === 'caregiver' ? 'village' : 'household';
       const res = await fetch(`/api/shifts?scope=${scope}`);
-      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      if (res.status === 409 || res.status === 401) {
+        // No active household yet (Clerk still hydrating, or user has no household).
+        // Render empty state, not an error.
+        setRows([]);
+        return;
+      }
+      if (!res.ok) throw new Error('Couldn\u2019t load shifts');
       const data = await res.json() as { shifts: ShiftRow[] };
       setRows(data.shifts);
     } catch (err) {

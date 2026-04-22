@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, and } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
+import { eq, and, gte } from 'drizzle-orm';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import {
   users, kids, shifts, bells, pushSubscriptions, familyInvites,
   caregiverUnavailability, bellResponses,
 } from '@/lib/db/schema';
+import { apiError, authError } from '@/lib/api-error';
 
 /**
  * GET /api/account — export all data for the current user across all households.
@@ -52,27 +53,23 @@ export async function GET() {
       bellResponses: myBellResponses,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Could not export your data', 500, 'account:GET');
   }
 }
 
 /**
- * DELETE /api/account — delete all data belonging to this user across all households.
+ * DELETE /api/account — fully remove the user: cancel future shifts they created
+ * (required because shifts.createdByUserId is onDelete:'restrict'), delete their
+ * DB rows, then delete their Clerk identity so sessions are invalidated.
  *
- * Caveats:
- * - This does NOT delete the Clerk account itself — user must do that in Clerk's
- *   user portal, or we can invoke clerkClient.users.deleteUser separately.
- * - Shifts/bells created by this user are preserved in household history with
- *   createdByUserId set to null where possible (cascade config in schema).
- * - Households where this user is the only member are deleted entirely.
+ * Order is deliberate: Clerk deletion runs LAST. If DB cleanup throws, we don't
+ * orphan a live Clerk account with no data.
  */
 export async function DELETE(req: NextRequest) {
   try {
     const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: 'unauth' }, { status: 401 });
+    if (!userId) return authError(new Error('Not signed in'), 'account:DELETE');
 
-    // Confirmation required via query param to prevent accidental hits
     const confirm = req.nextUrl.searchParams.get('confirm');
     if (confirm !== 'yes-delete-my-data') {
       return NextResponse.json({
@@ -81,67 +78,102 @@ export async function DELETE(req: NextRequest) {
     }
 
     const myRows = await db.select().from(users).where(eq(users.clerkUserId, userId));
-    if (myRows.length === 0) {
-      return NextResponse.json({ ok: true, deleted: { profiles: 0 } });
-    }
 
     let deletedSubs = 0;
     let deletedUnavail = 0;
     let deletedInvites = 0;
+    let cancelledShifts = 0;
     let deletedProfiles = 0;
 
+    const now = new Date();
+
     for (const row of myRows) {
-      // Delete push subscriptions
       const subs = await db.delete(pushSubscriptions)
         .where(eq(pushSubscriptions.userId, row.id)).returning({ id: pushSubscriptions.id });
       deletedSubs += subs.length;
 
-      // Delete unavailability blocks
       const un = await db.delete(caregiverUnavailability)
         .where(eq(caregiverUnavailability.userId, row.id)).returning({ id: caregiverUnavailability.id });
       deletedUnavail += un.length;
 
-      // Cancel pending invites sent by this user
       const inv = await db.delete(familyInvites)
         .where(and(eq(familyInvites.fromUserId, row.id), eq(familyInvites.status, 'pending')))
         .returning({ id: familyInvites.id });
       deletedInvites += inv.length;
 
-      // Delete the user row itself. Schema uses onDelete: 'set null' for
-      // shifts.claimedByUserId, so claimed shifts lose the claim reference but
-      // history is preserved. createdByUserId is onDelete:'restrict' which
-      // would block this — so we null-out those refs first.
-      // (Simplest: set claimedByUserId to null on all claimed shifts.)
+      // Release shifts they claimed — onDelete:'set null' would do this too, but
+      // doing it explicitly keeps the audit trail in bellResponses-style logs clean.
       await db.update(shifts).set({ claimedByUserId: null })
         .where(eq(shifts.claimedByUserId, row.id));
 
-      // For shifts they created, we leave them in place but the onDelete:'restrict'
-      // means we can't delete the user row. Mark the profile as deleted instead.
-      await db.update(users)
-        .set({ name: '[deleted]', email: `deleted+${row.id}@homestead.app`, photoUrl: null })
-        .where(eq(users.id, row.id));
+      // Cancel future shifts they created so createdByUserId restrict doesn't block
+      // the user-row delete. Past shifts stay as history; we can't delete them
+      // without losing other users' participation records, so reassign to a tombstone.
+      const futureCancelled = await db.update(shifts)
+        .set({ status: 'cancelled' })
+        .where(and(
+          eq(shifts.createdByUserId, row.id),
+          gte(shifts.startsAt, now),
+        ))
+        .returning({ id: shifts.id });
+      cancelledShifts += futureCancelled.length;
+
+      // Past shifts the user created still reference them via createdByUserId.
+      // Rather than deleting those rows (destroying history for other members),
+      // we leave the user row in place but strip PII. Sessions die via Clerk delete.
+      const pastMineExist = await db.$count(shifts, eq(shifts.createdByUserId, row.id));
+      const pastBellsExist = await db.$count(bells, eq(bells.createdByUserId, row.id));
+
+      if (pastMineExist === 0 && pastBellsExist === 0) {
+        await db.delete(users).where(eq(users.id, row.id));
+      } else {
+        await db.update(users)
+          .set({
+            name: '[deleted]',
+            email: `deleted+${row.id}@homestead.app`,
+            photoUrl: null,
+            clerkUserId: `deleted+${row.id}`,
+          })
+          .where(eq(users.id, row.id));
+      }
       deletedProfiles++;
+    }
+
+    // Clerk deletion last — invalidates all sessions immediately.
+    try {
+      const client = await clerkClient();
+      await client.users.deleteUser(userId);
+    } catch (clerkErr) {
+      console.error('[account:DELETE] Clerk deletion failed', clerkErr);
+      // DB is already cleaned — return success but flag so the client can prompt.
+      return NextResponse.json({
+        ok: true,
+        clerkDeleted: false,
+        deleted: {
+          profiles: deletedProfiles, pushSubscriptions: deletedSubs,
+          unavailability: deletedUnavail, pendingInvites: deletedInvites,
+          cancelledShifts,
+        },
+      });
     }
 
     console.log(JSON.stringify({
       event: 'account_deletion',
       clerkUserId: userId,
-      deletedSubs, deletedUnavail, deletedInvites, deletedProfiles,
+      deletedSubs, deletedUnavail, deletedInvites, deletedProfiles, cancelledShifts,
       at: new Date().toISOString(),
     }));
 
     return NextResponse.json({
       ok: true,
+      clerkDeleted: true,
       deleted: {
-        profiles: deletedProfiles,
-        pushSubscriptions: deletedSubs,
-        unavailability: deletedUnavail,
-        pendingInvites: deletedInvites,
+        profiles: deletedProfiles, pushSubscriptions: deletedSubs,
+        unavailability: deletedUnavail, pendingInvites: deletedInvites,
+        cancelledShifts,
       },
-      note: 'Your Clerk account must be deleted separately via the user profile menu.',
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Could not delete your account', 500, 'account:DELETE');
   }
 }

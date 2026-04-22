@@ -714,8 +714,13 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number; name: string } | null>(null);
   // Stable refs for drop zone containers — keyed by group
   const groupRefs = useRef<Record<VillageGroup, HTMLDivElement | null>>({ inner: null, family: null, sitter: null });
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ id: string; startX: number; startY: number; active: boolean; name: string } | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Edge auto-scroll state during drag
+  const autoScrollRef = useRef<{ raf: number | null; dir: number; lastY: number }>({ raf: null, dir: 0, lastY: 0 });
+  // Shadow ref mirroring ghostPos so the rAF loop can read without stale closure
+  const ghostPosRef = useRef<{ x: number; y: number; name: string } | null>(null);
 
   // Hit-test pointer position against group containers
   const hitTestGroup = useCallback((x: number, y: number): VillageGroup | null => {
@@ -728,22 +733,67 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
     return null;
   }, []);
 
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollRef.current.raf != null) {
+      cancelAnimationFrame(autoScrollRef.current.raf);
+      autoScrollRef.current.raf = null;
+    }
+    autoScrollRef.current.dir = 0;
+  }, []);
+
+  const startAutoScroll = useCallback((dir: number) => {
+    if (autoScrollRef.current.dir === dir) return;
+    autoScrollRef.current.dir = dir;
+    if (autoScrollRef.current.raf != null) return;
+    const tick = () => {
+      const { dir: d } = autoScrollRef.current;
+      const el = scrollRef.current;
+      if (!d || !el) { autoScrollRef.current.raf = null; return; }
+      // Speed scales with how close to the edge (computed in onMove); keep simple here.
+      el.scrollBy({ top: d * 10 });
+      // Re-run hit-test against the last known pointer y so dragOverGroup stays fresh
+      const y = autoScrollRef.current.lastY;
+      const g = hitTestGroup(ghostPosRef.current?.x ?? 0, y);
+      setDragOverGroup(g);
+      autoScrollRef.current.raf = requestAnimationFrame(tick);
+    };
+    autoScrollRef.current.raf = requestAnimationFrame(tick);
+  }, [hitTestGroup]);
+
   const endDrag = useCallback(() => {
     if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    stopAutoScroll();
     dragStateRef.current = null;
+    ghostPosRef.current = null;
     setDraggingId(null);
     setDragOverGroup(null);
     setGhostPos(null);
-  }, []);
+  }, [stopAutoScroll]);
 
   useEffect(() => {
     if (!draggingId) return;
+    const EDGE_ZONE = 64;
     const onMove = (e: PointerEvent) => {
       if (!dragStateRef.current?.active) return;
       e.preventDefault();
+      ghostPosRef.current = { x: e.clientX, y: e.clientY, name: dragStateRef.current.name };
       setGhostPos({ x: e.clientX, y: e.clientY, name: dragStateRef.current.name });
       const g = hitTestGroup(e.clientX, e.clientY);
       setDragOverGroup(g);
+
+      // Edge-driven auto-scroll so drops can reach sections below/above the fold
+      const container = scrollRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        autoScrollRef.current.lastY = e.clientY;
+        if (e.clientY < rect.top + EDGE_ZONE) {
+          startAutoScroll(-1);
+        } else if (e.clientY > rect.bottom - EDGE_ZONE) {
+          startAutoScroll(1);
+        } else {
+          stopAutoScroll();
+        }
+      }
     };
     const onUp = (e: PointerEvent) => {
       const state = dragStateRef.current;
@@ -764,7 +814,7 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onCancel);
     };
-  }, [draggingId, adults, hitTestGroup, endDrag]);
+  }, [draggingId, adults, hitTestGroup, endDrag, startAutoScroll, stopAutoScroll]);
 
   const handlePointerDownDrag = useCallback((id: string, e: React.PointerEvent) => {
     const member = adults.find(a => a.id === id);
@@ -858,7 +908,7 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
         folioLeft="No. 142" folioRight="Homestead Press"
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 24px 120px' }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 24px 120px' }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', fontFamily: G.serif, fontStyle: 'italic', color: G.muted }}>
             Loading your village…

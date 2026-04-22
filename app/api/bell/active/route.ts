@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { bells, users, bellResponses } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
 import { auth } from '@clerk/nextjs/server';
+import { apiError, authError } from '@/lib/api-error';
 
 // GET /api/bell/active
 // Returns ringing bells visible to this user:
@@ -46,7 +47,6 @@ export async function GET() {
 
     return NextResponse.json({ bells: result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Could not load active bell', 500, 'bell:active');
   }
 }

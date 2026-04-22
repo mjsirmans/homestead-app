@@ -12,11 +12,12 @@ import { ScreenSettings } from './ScreenSettings';
 import { HouseholdProvider, useHousehold } from './HouseholdSwitcher';
 import { InstallHint } from './InstallHint';
 
-// Dev-only role switcher — disabled in production builds
-// Set NEXT_PUBLIC_DEV_CLERK_USER_ID to enable for a specific Clerk user in preview/dev
-const DEV_USER_ID = process.env.NODE_ENV === 'production'
-  ? (process.env.NEXT_PUBLIC_DEV_CLERK_USER_ID === 'user_3CeQiFzHv2dCasCCiNx7xGEn8Vu' ? null : null)
-  : 'user_3CeQiFzHv2dCasCCiNx7xGEn8Vu';
+// Role switcher — enabled for emails in NEXT_PUBLIC_DEV_EMAILS (comma-separated).
+// Changes only client-side UI; server APIs still enforce real role via DB.
+const DEV_EMAILS = (process.env.NEXT_PUBLIC_DEV_EMAILS ?? '')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
 
 type TabId = 'almanac' | 'post' | 'village' | 'shifts' | 'bell' | 'settings';
 type Role = 'parent' | 'caregiver';
@@ -146,11 +147,12 @@ function RoleSwitcherMobile({ role, onChange }: { role: Role; onChange: (r: Role
 export function HomesteadApp() {
   const { user } = useUser();
   const { isDualRole } = useHousehold();
-  const canSwitchRole = !!DEV_USER_ID && user?.id === DEV_USER_ID;
+  const primaryEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? '';
+  const canSwitchRole = !!primaryEmail && DEV_EMAILS.includes(primaryEmail);
 
-  // If DEV_USER_ID is set, seed role from localStorage immediately (before Clerk loads)
+  // Seed role from localStorage for allowlisted users so their manual toggle persists.
   const [role, setRole] = useState<Role>(() => {
-    if (typeof window !== 'undefined' && DEV_USER_ID) {
+    if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('hs.role') as Role | null;
       if (saved === 'parent' || saved === 'caregiver') return saved;
     }
@@ -183,8 +185,8 @@ export function HomesteadApp() {
 
   useEffect(() => { localStorage.setItem('hs.screen', screen); }, [screen]);
   useEffect(() => {
-    if (DEV_USER_ID) localStorage.setItem('hs.role', role);
-  }, [role]);
+    if (canSwitchRole) localStorage.setItem('hs.role', role);
+  }, [role, canSwitchRole]);
 
   const navigate = useCallback((id: TabId) => setScreen(id), []);
 

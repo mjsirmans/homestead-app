@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { bells } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
 import { rateLimit, rateLimitResponse } from '@/lib/ratelimit';
-
+import { apiError } from '@/lib/api-error';
 export async function POST(req: NextRequest) {
   try {
     const { household, user } = await requireHousehold();
@@ -49,8 +49,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ bell });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Bell action failed', 500, 'bell');
   }
 }
 
@@ -62,7 +61,6 @@ export async function GET() {
       .orderBy(desc(bells.createdAt));
     return NextResponse.json({ bells: activeBells });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Bell action failed', 500, 'bell');
   }
 }

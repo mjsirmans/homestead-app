@@ -3,7 +3,7 @@ import { asc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
-
+import { authError } from '@/lib/api-error';
 export async function GET() {
   try {
     const { household, user } = await requireHousehold();
@@ -22,7 +22,6 @@ export async function GET() {
       })),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 401 });
+    return authError(err, 'household:members');
   }
 }

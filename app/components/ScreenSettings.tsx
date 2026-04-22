@@ -1,12 +1,13 @@
 'use client';
 import React, { useState } from 'react';
-import { UserButton, useUser } from '@clerk/nextjs';
+import { UserButton, useUser, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { G } from './tokens';
 import { GMasthead, GLabel } from './shared';
 
 export function ScreenSettings({ onBack }: { onBack?: () => void }) {
   const { user } = useUser();
+  const { signOut } = useClerk();
   const [deletingState, setDeletingState] = useState<'idle' | 'confirming' | 'deleting' | 'done' | 'error'>('idle');
   const [exportUrl, setExportUrl] = useState<string | null>(null);
   const [exportingState, setExportingState] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -39,6 +40,15 @@ export function ScreenSettings({ onBack }: { onBack?: () => void }) {
         throw new Error(data.error || `Delete failed (${res.status})`);
       }
       setDeletingState('done');
+      // Clear client storage so nothing lingers after we sign the user out.
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch { /* ignore quota/private-mode errors */ }
+      // signOut destroys the Clerk session in this browser; the Clerk account
+      // itself was deleted server-side. Redirect home so the app doesn't keep
+      // rendering against a dead identity.
+      await signOut({ redirectUrl: '/' });
     } catch (e) {
       setDeletingState('error');
       setErrorMsg(e instanceof Error ? e.message : 'Delete failed');

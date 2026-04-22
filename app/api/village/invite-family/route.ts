@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { familyInvites, users } from '@/lib/db/schema';
-
+import { apiError } from '@/lib/api-error';
 // Caregiver invites a parent of a new family to join Homestead
 // Creates a pending invite; parent accepts via /accept-family-invite?token=...
 export async function POST(req: NextRequest) {
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, inviteUrl });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Invite failed', 500, 'village:invite-family');
   }
 }

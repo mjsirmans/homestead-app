@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { households, users } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
 import { auth, clerkClient } from '@clerk/nextjs/server';
+import { apiError, authError } from '@/lib/api-error';
 
 export async function GET() {
   try {
@@ -50,8 +51,7 @@ export async function GET() {
       isDualRole,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 401 });
+    return authError(err, 'household');
   }
 }
 
@@ -86,7 +86,6 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ household: updated });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Household action failed', 500, 'household');
   }
 }

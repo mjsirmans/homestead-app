@@ -3,7 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { bells, bellResponses, users } from '@/lib/db/schema';
 import { auth } from '@clerk/nextjs/server';
-
+import { apiError } from '@/lib/api-error';
 type ResponseBody = { response: 'on_my_way' | 'in_thirty' | 'cannot' };
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -54,7 +54,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Could not respond to bell', 500, 'bell:respond');
   }
 }

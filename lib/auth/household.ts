@@ -2,6 +2,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 import { eq, and } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { households, users } from '@/lib/db/schema';
+import { looksLikeSlug } from '@/lib/format';
 
 export async function requireHousehold() {
   const { userId, orgId } = await auth();
@@ -45,6 +46,20 @@ export async function requireHousehold() {
       role: meta.appRole || (isFirstUser ? 'parent' : 'caregiver'),
       villageGroup: meta.villageGroup || (isFirstUser ? 'inner' : 'family'),
     }).returning();
+  } else if (looksLikeSlug(user.name)) {
+    // Backfill: the row was seeded from email/username before Clerk collected a
+    // real first/last. Re-sync when Clerk now has one so UI shows "First L."
+    try {
+      const clerkUser = await client.users.getUser(userId);
+      const resolved = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim();
+      if (resolved && resolved !== user.name && !looksLikeSlug(resolved)) {
+        const [updated] = await db.update(users)
+          .set({ name: resolved })
+          .where(eq(users.id, user.id))
+          .returning();
+        if (updated) user = updated;
+      }
+    } catch { /* best-effort; don't fail the request on Clerk hiccup */ }
   }
 
   return { household, user };

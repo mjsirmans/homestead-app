@@ -35,6 +35,19 @@ export function normaliseStoredName(stored: string): string {
   return trimmed;
 }
 
+/**
+ * True when a stored name looks like an auto-generated slug — email, single-token
+ * username, or dot/underscore-separated handle. These are the values the backfill
+ * should overwrite the next time Clerk's firstName/lastName become available.
+ */
+export function looksLikeSlug(name: string | null | undefined): boolean {
+  const t = (name ?? '').trim();
+  if (!t) return true;
+  if (t.includes('@')) return true; // raw email
+  if (!t.includes(' ')) return true; // single token (slug or username)
+  return false;
+}
+
 export function shortName(full: string): string {
   const trimmed = full.trim();
   if (!trimmed) return '';

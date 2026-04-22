@@ -4,6 +4,9 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { shifts, users, households } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
+import { apiError, authError } from '@/lib/api-error';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(req: NextRequest) {
   try {
@@ -109,8 +112,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ shifts: enriched, meClerkUserId: userId });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 401 });
+    return authError(err, 'shifts:GET');
   }
 }
 
@@ -134,6 +136,11 @@ export async function POST(req: NextRequest) {
       endsAt?: string;
       rateCents?: number | null;
       preferredCaregiverId?: string;
+      recurrence?: {
+        daysOfWeek?: number[];
+        endsBy?: string;
+        occurrences?: number;
+      };
     };
 
     if (!body.title || !body.startsAt || !body.endsAt) {
@@ -146,25 +153,88 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid time range' }, { status: 400 });
     }
 
-    const [created] = await db.insert(shifts).values({
+    // Coerce invalid/empty preferredCaregiverId to null so bad client state
+    // doesn't cause a uuid cast failure in Postgres.
+    const preferredCaregiverId =
+      body.preferredCaregiverId && UUID_RE.test(body.preferredCaregiverId)
+        ? body.preferredCaregiverId
+        : null;
+
+    const baseValues = {
       householdId: household.id,
       createdByUserId: user.id,
       title: body.title.trim().slice(0, 200),
       forWhom: body.forWhom?.trim().slice(0, 200) || null,
       notes: body.notes?.trim().slice(0, 2000) || null,
-      startsAt: starts,
-      endsAt: ends,
       rateCents: body.rateCents ?? null,
-      preferredCaregiverId: body.preferredCaregiverId ?? null,
-    }).returning();
+      preferredCaregiverId,
+    };
 
-    // Fire-and-forget notification (targeted if preferredCaregiverId set)
-    notifyShiftPosted(created.id, body.preferredCaregiverId).catch(() => {});
+    // If recurrence is provided, expand into N shifts matching the selected
+    // weekdays starting from the initial starts/ends pair.
+    const recurrence = body.recurrence;
+    const valuesList: Array<typeof baseValues & {
+      startsAt: Date;
+      endsAt: Date;
+      isRecurring: boolean;
+      recurDayOfWeek: number | null;
+      recurEndsAt: string | null;
+      recurOccurrences: number | null;
+    }> = [];
 
-    return NextResponse.json({ shift: created });
+    if (recurrence && Array.isArray(recurrence.daysOfWeek) && recurrence.daysOfWeek.length > 0) {
+      const days = [...new Set(recurrence.daysOfWeek)].filter(d => d >= 0 && d <= 6).sort();
+      const maxOccurrences = Math.min(Math.max(recurrence.occurrences ?? 0, 0) || 52, 52);
+      const endsBy = recurrence.endsBy ? new Date(recurrence.endsBy) : null;
+      const durationMs = +ends - +starts;
+
+      // Walk forward day-by-day from starts, emitting a shift when the weekday matches.
+      const cursor = new Date(starts);
+      let produced = 0;
+      const hardStop = new Date(+starts + 366 * 86400000); // safety cap: 1 year
+      while (produced < (maxOccurrences || 52) && cursor <= hardStop) {
+        if (endsBy && cursor > endsBy) break;
+        const dow = cursor.getDay();
+        if (days.includes(dow)) {
+          const instanceStart = new Date(cursor);
+          const instanceEnd = new Date(+instanceStart + durationMs);
+          valuesList.push({
+            ...baseValues,
+            startsAt: instanceStart,
+            endsAt: instanceEnd,
+            isRecurring: true,
+            recurDayOfWeek: dow,
+            recurEndsAt: endsBy ? endsBy.toISOString().slice(0, 10) : null,
+            recurOccurrences: maxOccurrences || null,
+          });
+          produced++;
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      if (valuesList.length === 0) {
+        return NextResponse.json({ error: 'recurrence produced no shifts' }, { status: 400 });
+      }
+    } else {
+      valuesList.push({
+        ...baseValues,
+        startsAt: starts,
+        endsAt: ends,
+        isRecurring: false,
+        recurDayOfWeek: null,
+        recurEndsAt: null,
+        recurOccurrences: null,
+      });
+    }
+
+    const created = await db.insert(shifts).values(valuesList).returning();
+
+    // Fire-and-forget notification for the first shift (avoids N-fold spam on recurring)
+    if (created[0]) notifyShiftPosted(created[0].id, preferredCaregiverId ?? undefined).catch(() => {});
+
+    return NextResponse.json({ shift: created[0], count: created.length });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Could not post shift. Try again.', 500, 'shifts:POST');
   }
 }
 

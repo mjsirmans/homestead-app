@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { users, kids, households } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
 import { normaliseStoredName } from '@/lib/format';
+import { apiError, authError } from '@/lib/api-error';
 
 export async function GET(req: NextRequest) {
   try {
@@ -42,8 +43,7 @@ export async function GET(req: NextRequest) {
     const normalised = adults.map(a => ({ ...a, name: normaliseStoredName(a.name) }));
     return NextResponse.json({ adults: normalised, kids: kidsList });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 401 });
+    return authError(err, 'village');
   }
 }
 
@@ -82,8 +82,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Village action failed', 500, 'village');
   }
 }
 
@@ -105,7 +104,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(err, 'Village action failed', 500, 'village');
   }
 }
