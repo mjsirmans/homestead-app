@@ -13,11 +13,23 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export async function GET(req: NextRequest) {
   try {
-    const { household, user } = await requireHousehold();
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'unauth' }, { status: 401 });
 
     const scope = req.nextUrl.searchParams.get('scope') || 'household';
+
+    // scope=mine doesn't need an active org — just find all shifts claimed by
+    // this user across every household they belong to.
+    // All other scopes need requireHousehold() for the active household context.
+    let activeHousehold: { id: string } | null = null;
+    if (scope !== 'mine') {
+      try {
+        const { household } = await requireHousehold();
+        activeHousehold = household;
+      } catch {
+        return NextResponse.json({ error: 'no_household' }, { status: 409 });
+      }
+    }
 
     const client = await clerkClient();
     const memberships = await client.users.getOrganizationMembershipList({ userId });
@@ -60,11 +72,17 @@ export async function GET(req: NextRequest) {
         ),
       );
     } else if (scope === 'mine') {
-      if (!myUserIds.length) return NextResponse.json({ shifts: [], meClerkUserId: userId });
+      // Find all users rows for this Clerk user (across all households, not just active org)
+      // so caregivers see shifts they claimed even before setting an active org.
+      const allMyUserRows = await db.select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkUserId, userId));
+      const allMyUserIds = allMyUserRows.map(u => u.id);
+      if (!allMyUserIds.length) return NextResponse.json({ shifts: [], meClerkUserId: userId });
       where = and(
         or(
-          inArray(shifts.claimedByUserId, myUserIds),
-          inArray(shifts.createdByUserId, myUserIds),
+          inArray(shifts.claimedByUserId, allMyUserIds),
+          inArray(shifts.createdByUserId, allMyUserIds),
         ),
         gte(shifts.endsAt, new Date()),
       );
@@ -86,8 +104,9 @@ export async function GET(req: NextRequest) {
         or(...clauses as [typeof clauses[0], ...typeof clauses]),
       );
     } else {
+      if (!activeHousehold) return NextResponse.json({ error: 'no_household' }, { status: 409 });
       where = and(
-        eq(shifts.householdId, household.id),
+        eq(shifts.householdId, activeHousehold.id),
         gte(shifts.endsAt, new Date()),
       );
     }
@@ -107,7 +126,12 @@ export async function GET(req: NextRequest) {
       .where(where)
       .orderBy(orderBy);
 
-    const myUserIdSet = new Set(myUserIds);
+    // For enrichment, include all users rows across all households so claimedByMe
+    // is accurate even when the caregiver's active org differs from the shift's household.
+    const allMyUserRowsForEnrich = myUserIds.length
+      ? myUserRows
+      : await db.select({ id: users.id }).from(users).where(eq(users.clerkUserId, userId));
+    const myUserIdSet = new Set([...myUserIds, ...allMyUserRowsForEnrich.map(u => u.id)]);
     const enriched = rows.map(r => ({
       ...r,
       claimedByMe: r.shift.claimedByUserId ? myUserIdSet.has(r.shift.claimedByUserId) : false,
