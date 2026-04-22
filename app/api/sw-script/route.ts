@@ -1,18 +1,29 @@
-// Homestead Service Worker — local dev fallback.
-// In production, /sw.js is served by /api/sw-script with the deploy SHA
-// embedded so the browser auto-detects new deployments.
+import { NextResponse } from 'next/server';
+
+// Serves the service worker JS with the current deploy SHA embedded.
+// Because the SW file content changes on every deploy (the SHA changes),
+// the browser byte-compares it against the installed SW and installs the
+// new version automatically — no manual SW_VERSION bump required.
+//
+// Mapped from /sw.js via next.config.ts rewrites so the SW scope stays at /.
+
+const DEPLOY_SHA = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev';
+
+export async function GET() {
+  const swContent = `
+// Homestead Service Worker — build ${DEPLOY_SHA}
+// This comment changes every deploy so the browser detects a new SW automatically.
 
 self.addEventListener('install', () => {
-  // Activate this SW immediately instead of waiting for old tabs to close.
-  // Safe because our SW doesn't cache routable assets — Next handles that.
+  // Activate immediately — skip the "waiting" phase.
+  // Safe because we don't cache routable assets; Next.js handles that.
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Take control of open pages right away, then tell every open client to
-  // reload so they get the freshly deployed JS/HTML. iOS PWA ignores
-  // Cache-Control headers on the HTML shell — the SW message is the only
-  // reliable trigger for a silent in-place refresh.
+  // Take control of all open tabs immediately, then tell every open client to
+  // reload so they get the new JS/HTML. iOS PWA ignores Cache-Control headers
+  // on the HTML shell — this SW message is the only reliable silent trigger.
   event.waitUntil(
     self.clients.claim().then(() =>
       self.clients.matchAll({ type: 'window', includeUncontrolled: false }).then(clientList => {
@@ -59,4 +70,14 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+`.trim();
 
+  return new NextResponse(swContent, {
+    headers: {
+      'Content-Type': 'application/javascript',
+      // Never cache — browser must check for a new SW on every registration call.
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Service-Worker-Allowed': '/',
+    },
+  });
+}

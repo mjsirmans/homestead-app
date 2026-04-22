@@ -8,6 +8,17 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
     NEXT_PUBLIC_APP_SHA: sha,
   },
+  async rewrites() {
+    return [
+      {
+        // Route /sw.js to the dynamic handler that embeds the deploy SHA.
+        // The static public/sw.js is the fallback for local dev (no SHA available).
+        // In production the rewrite takes precedence over the static file.
+        source: '/sw.js',
+        destination: '/api/sw-script',
+      },
+    ];
+  },
   async headers() {
     return [
       {
