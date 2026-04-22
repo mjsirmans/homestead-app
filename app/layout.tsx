@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { PushRegistrar } from './components/PushRegistrar';
+import { AutoUpdate } from './components/AutoUpdate';
 import './globals.css';
+
+const APP_SHA = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'dev';
 
 export const metadata: Metadata = {
   title: 'Homestead',
@@ -30,7 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <ClerkProvider>
       <html lang="en">
+        <head>
+          <meta name="app-sha" content={APP_SHA} />
+        </head>
         <body>
+          <AutoUpdate />
           <PushRegistrar />
           {children}
         </body>
