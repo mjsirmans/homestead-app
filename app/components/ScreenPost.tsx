@@ -67,6 +67,28 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function resetForm() {
+    const now = new Date();
+    const start = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    start.setMinutes(0, 0, 0);
+    const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+    setTitle('');
+    setForWhom('');
+    setSelectedKidIds([]);
+    setNotes('');
+    setStartsAt(toLocalInputValue(start));
+    setEndsAt(toLocalInputValue(end));
+    setIsPaid(false);
+    setRate('22');
+    setIsRecurring(false);
+    setRecurDays(new Set([1]));
+    setRecurEnds('count');
+    setRecurEndDate('');
+    setRecurCount('8');
+    setPreferredCaregiverId('');
+    setError(null);
+  }
+
   async function submit() {
     setError(null);
     if (!title.trim()) return setError('Add a short title.');
@@ -74,6 +96,10 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
     const e = new Date(endsAt);
     if (isNaN(+s) || isNaN(+e)) return setError('Pick a start and end time.');
     if (e <= s) return setError('End must be after start.');
+    // Guard: recurring "end by date" with no date filled in
+    if (isRecurring && recurEnds === 'date' && !recurEndDate.trim()) {
+      return setError('Pick an end date for your recurring shift.');
+    }
     setSubmitting(true);
     try {
       const rateCents = isPaid && rate.trim() ? Math.round(parseFloat(rate) * 100) : null;
@@ -84,7 +110,7 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
       const forWhomFinal = [kidNames, forWhom.trim()].filter(Boolean).join(' · ');
       const recurrence = isRecurring ? {
         daysOfWeek: Array.from(recurDays).sort(),
-        endsBy: recurEnds === 'date' ? recurEndDate || undefined : undefined,
+        endsBy: recurEnds === 'date' ? recurEndDate : undefined,
         occurrences: recurEnds === 'count' ? parseInt(recurCount) || undefined : undefined,
       } : undefined;
       const res = await fetch('/api/shifts', {
@@ -105,7 +131,10 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Failed (${res.status})`);
       }
-      onPost?.('Posted to the Village');
+      const data = await res.json();
+      resetForm();
+      const count = data.count ?? 1;
+      onPost?.(count > 1 ? `${count} shifts posted` : 'Posted to the Village');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to post');
     } finally {

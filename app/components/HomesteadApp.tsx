@@ -213,6 +213,19 @@ export function HomesteadApp() {
   }, [user?.id, canSwitchRole]);
 
   useEffect(() => {
+    // Deep-link from push notification: ?tab=bell (or ?tab=almanac etc.)
+    // This runs on app open so tapping a notification lands on the right screen.
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab') as TabId | null;
+    const validTabs: TabId[] = ['almanac', 'post', 'village', 'shifts', 'bell', 'settings'];
+    if (tabParam && validTabs.includes(tabParam)) {
+      setScreen(tabParam);
+      // Clean the URL so the param doesn't persist on refresh
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete('tab');
+      window.history.replaceState({}, '', clean.pathname + (clean.search || ''));
+      return; // don't apply localStorage over the deep-link
+    }
     const savedScreen = localStorage.getItem('hs.screen') as TabId | null;
     if (savedScreen) setScreen(savedScreen);
   }, []);

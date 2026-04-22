@@ -464,6 +464,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
   const [unavailEndTime, setUnavailEndTime] = useState('17:00');
   const [unavailNote, setUnavailNote] = useState('');
   const [savingUnavail, setSavingUnavail] = useState(false);
+  const [unavailError, setUnavailError] = useState<string | null>(null);
   // derived for API
   const unavailStart = unavailDate ? `${unavailDate}T${unavailStartTime}` : '';
   const unavailEnd = unavailEndDate ? `${unavailEndDate}T${unavailEndTime}` : '';
@@ -512,13 +513,21 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
   useEffect(() => { loadUnavail(); }, [loadUnavail]);
 
   async function saveUnavail() {
+    setUnavailError(null);
     if (!unavailStart || !unavailEnd) return;
+    // Client-side validation before hitting the server
+    const s = new Date(unavailStart);
+    const e = new Date(unavailEnd);
+    if (e <= s) {
+      setUnavailError('End time must be after start time.');
+      return;
+    }
     setSavingUnavail(true);
     try {
       const res = await fetch('/api/unavailability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startsAt: new Date(unavailStart).toISOString(), endsAt: new Date(unavailEnd).toISOString(), note: unavailNote || undefined }),
+        body: JSON.stringify({ startsAt: s.toISOString(), endsAt: e.toISOString(), note: unavailNote || undefined }),
       });
       if (res.ok) {
         setShowUnavailForm(false);
@@ -526,7 +535,12 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
         setUnavailEndDate(''); setUnavailEndTime('17:00');
         setUnavailNote('');
         await loadUnavail();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setUnavailError(data.error || 'Could not save. Try again.');
       }
+    } catch {
+      setUnavailError('Network error. Try again.');
     } finally {
       setSavingUnavail(false);
     }
@@ -851,6 +865,11 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
                   cursor: (savingUnavail || !unavailStart || !unavailEnd) ? 'not-allowed' : 'pointer',
                   opacity: (savingUnavail || !unavailStart || !unavailEnd) ? 0.5 : 1,
                 }}>{savingUnavail ? 'Saving…' : 'Block this time'}</button>
+                {unavailError && (
+                  <div style={{ padding: '8px 10px', borderRadius: 6, background: '#FFE6DA', fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: '#7A2F12' }}>
+                    {unavailError}
+                  </div>
+                )}
               </div>
             )}
 

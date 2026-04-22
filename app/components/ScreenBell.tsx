@@ -195,8 +195,9 @@ function BellCompose({ onRing, onBack, onPost }: {
           endsAt,
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || 'Failed to ring bell');
-      const data = await res.json();
+      // Parse JSON once — calling .json() twice on the same response throws "body already used"
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to ring bell');
       onRing(data.bell.id, reasons[why].label);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong');

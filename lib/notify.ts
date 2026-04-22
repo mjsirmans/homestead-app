@@ -57,19 +57,20 @@ export async function notifyNewShift(shiftId: string, preferredCaregiverId?: str
   const when = row.shift.startsAt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
   // Push notification — targeted or broadcast
+  // ?tab=almanac opens the Open Shifts tab so caregivers can claim immediately
   import('@/lib/push').then(({ pushToUser, pushToHousehold }) => {
     if (preferredCaregiverId) {
       return pushToUser(preferredCaregiverId, {
         title: `📋 ${row.household!.name} needs you`,
         body: `${row.shift.title} · ${when}`,
-        url: '/',
+        url: '/?tab=almanac',
         tag: `shift-${shiftId}`,
       });
     }
     return pushToHousehold(row.household!.id, row.shift.createdByUserId, {
       title: `📋 New shift — ${row.household!.name}`,
       body: `${row.shift.title} · ${when}`,
-      url: '/',
+      url: '/?tab=almanac',
       tag: `shift-${shiftId}`,
     });
   }).catch(() => {});

@@ -685,8 +685,8 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
   const removeAdult = async (id: string) => {
     const res = await fetch(`/api/household/members/${id}`, { method: 'DELETE' });
     if (!res.ok) {
-      // Error is surfaced inline in MemberCard's confirmingDelete UI
-      console.error('[removeAdult]', await res.json().catch(() => ({})));
+      const data = await res.json().catch(() => ({}));
+      setVillageError(data.error || 'Could not remove member. Try again.');
     }
     load();
   };

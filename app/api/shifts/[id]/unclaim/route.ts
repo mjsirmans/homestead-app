@@ -32,13 +32,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       .returning();
     if (!released) return NextResponse.json({ error: 'race lost' }, { status: 409 });
 
-    // Notify the parent who posted the shift
+    // Notify the parent — ?tab=almanac routes them to see the now-open shift
     pushToUser(shift.createdByUserId, {
       title: '⚠️ Shift released',
       body: reason
         ? `${claimer.name} can no longer cover "${shift.title}": ${reason}`
         : `${claimer.name} released "${shift.title}" — it's open again.`,
-      url: '/',
+      url: '/?tab=almanac',
       tag: `unclaim-${id}`,
     }).catch(() => {});
 

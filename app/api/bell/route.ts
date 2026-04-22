@@ -38,11 +38,12 @@ export async function POST(req: NextRequest) {
     }).returning();
 
     // Fire-and-forget push to all household members
+    // ?tab=bell routes caregivers directly to the Bell tab to respond
     import('@/lib/push').then(({ pushToHousehold }) =>
       pushToHousehold(household.id, user.id, {
         title: `🔔 ${household.name} needs help`,
         body: reason + (note ? ` — ${note}` : ''),
-        url: '/',
+        url: '/?tab=bell',
         tag: `bell-${bell.id}`,
       })
     ).catch(() => {});
