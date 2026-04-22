@@ -58,6 +58,22 @@ function Toast({ msg, onDone }: { msg: string; onDone: () => void }) {
   );
 }
 
+function useLiveClock() {
+  const [time, setTime] = useState(() => {
+    const now = new Date();
+    return `${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
+  });
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      setTime(`${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`);
+    };
+    const id = setInterval(tick, 10_000);
+    return () => clearInterval(id);
+  }, []);
+  return time;
+}
+
 function RoleSwitcherDesktop({ role, onChange }: { role: Role; onChange: (r: Role) => void }) {
   return (
     <div style={{ marginBottom: 18 }}>
@@ -163,6 +179,24 @@ export function HomesteadApp() {
   const [bellCount, setBellCount] = useState(0);
   const isMobile = useIsMobile();
 
+  // Poll for active bells so the badge stays current
+  useEffect(() => {
+    if (!user?.id) return;
+    const check = () => {
+      fetch('/api/bell/active')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data) return;
+          const active = Array.isArray(data.bells) ? data.bells.filter((b: { status: string }) => b.status === 'ringing').length : 0;
+          setBellCount(active);
+        })
+        .catch(() => {});
+    };
+    check();
+    const interval = setInterval(check, 30_000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
   // Load real role from API — dev user keeps localStorage; others get API role
   useEffect(() => {
     if (!user?.id) return;
@@ -189,6 +223,7 @@ export function HomesteadApp() {
   }, [role, canSwitchRole]);
 
   const navigate = useCallback((id: TabId) => setScreen(id), []);
+  const clockTime = useLiveClock();
 
   // Which tab pill to highlight. Non-nav screens (bell, settings) map to a neighbor.
   type NavTab = 'almanac' | 'post' | 'village' | 'shifts';
@@ -303,7 +338,7 @@ export function HomesteadApp() {
           fontFamily: '-apple-system, system-ui', fontWeight: 600, fontSize: 15, color: G.ink,
           zIndex: 40,
         }}>
-          <span>9:41</span>
+          <span>{clockTime}</span>
           <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
             <svg width="17" height="11" viewBox="0 0 17 11">
               <rect x="0" y="7" width="3" height="4" rx="0.6" fill={G.ink} />

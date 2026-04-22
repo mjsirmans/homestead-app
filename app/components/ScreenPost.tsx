@@ -344,9 +344,6 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
                   style={pillInput}
                 />
               </Pill>
-              <Pill label="Extras">
-                <input placeholder="optional" style={pillInput} />
-              </Pill>
             </div>
           )}
         </div>
