@@ -526,7 +526,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
             <ShiftCard
               key={r.shift.id} row={r}
               accent={r.shift.status === 'claimed' ? G.green : G.clay}
-              tagline={r.shift.status === 'claimed' ? 'Covered' : 'Open · needs someone'}
+              tagline={r.shift.status === 'claimed' ? (r.claimedByMe ? 'Claimed by you' : 'Covered') : 'Open · needs someone'}
               onCancel={role === 'parent' && r.createdByMe ? cancelShift : undefined}
               cancelling={cancellingId === r.shift.id}
               onClaim={r.shift.status === 'open' && (role === 'caregiver' || !r.createdByMe) ? claimShift : undefined}
@@ -543,7 +543,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
             <ShiftCard
               key={r.shift.id} row={r}
               accent={r.shift.status === 'claimed' ? G.green : G.clay}
-              tagline={r.shift.status === 'claimed' ? 'Covered' : 'Open · needs someone'}
+              tagline={r.shift.status === 'claimed' ? (r.claimedByMe ? 'Claimed by you' : 'Covered') : 'Open · needs someone'}
               onCancel={role === 'parent' && r.createdByMe ? cancelShift : undefined}
               cancelling={cancellingId === r.shift.id}
               onClaim={r.shift.status === 'open' && (role === 'caregiver' || !r.createdByMe) ? claimShift : undefined}
@@ -580,7 +580,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
                     <ShiftCard
                       key={r.shift.id} row={r}
                       accent={r.shift.status === 'claimed' ? G.green : G.clay}
-                      tagline={r.shift.status === 'claimed' ? 'Covered' : 'Open · needs someone'}
+                      tagline={r.shift.status === 'claimed' ? (r.claimedByMe ? 'Claimed by you' : 'Covered') : 'Open · needs someone'}
                       onCancel={role === 'parent' && r.createdByMe ? cancelShift : undefined}
                       cancelling={cancellingId === r.shift.id}
                       onClaim={r.shift.status === 'open' && (role === 'caregiver' || !r.createdByMe) ? claimShift : undefined}
@@ -601,7 +601,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
             <ShiftCard
               key={r.shift.id} row={r}
               accent={r.shift.status === 'claimed' ? G.green : G.clay}
-              tagline={r.shift.status === 'claimed' ? 'Covered' : 'Open · needs someone'}
+              tagline={r.shift.status === 'claimed' ? (r.claimedByMe ? 'Claimed by you' : 'Covered') : 'Open · needs someone'}
               onCancel={role === 'parent' && r.createdByMe ? cancelShift : undefined}
               cancelling={cancellingId === r.shift.id}
               onClaim={r.shift.status === 'open' && (role === 'caregiver' || !r.createdByMe) ? claimShift : undefined}
