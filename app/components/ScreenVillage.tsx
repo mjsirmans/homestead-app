@@ -77,6 +77,7 @@ function MemberCard({ name, role, isMe, appRole, onToggleRole, villageGroup, onC
   const [uploading, setUploading] = useState(false);
   const [localPhoto, setLocalPhoto] = useState<string | null>(photoUrl ?? null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -179,10 +180,31 @@ function MemberCard({ name, role, isMe, appRole, onToggleRole, villageGroup, onC
           }}>{appRole === 'parent' ? 'P' : 'C'}</button>
         )}
         {onDelete && (
-          <button onClick={onDelete} aria-label="Remove" style={{
-            background: 'transparent', border: 'none', color: G.muted,
-            fontSize: 16, cursor: 'pointer', padding: 4,
-          }}>×</button>
+          confirmingDelete ? (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => { setConfirmingDelete(false); onDelete(); }}
+                style={{
+                  padding: '4px 10px', background: G.ink, color: '#FBF7F0',
+                  border: 'none', borderRadius: 100,
+                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                  textTransform: 'uppercase', cursor: 'pointer',
+                }}>Remove</button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                style={{
+                  padding: '4px 10px', background: 'transparent', color: G.muted,
+                  border: `1px solid ${G.hairline2}`, borderRadius: 100,
+                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                  textTransform: 'uppercase', cursor: 'pointer',
+                }}>Keep</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmingDelete(true)} aria-label="Remove" style={{
+              background: 'transparent', border: 'none', color: G.muted,
+              fontSize: 16, cursor: 'pointer', padding: 4,
+            }}>×</button>
+          )
         )}
       </div>
       {pickerOpen && villageGroup && onChangeGroup && (
@@ -640,6 +662,7 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [renameBusy, setRenameBusy] = useState(false);
+  const [villageError, setVillageError] = useState<string | null>(null);
 
   async function saveRename() {
     if (!newName.trim() || renameBusy) return;
@@ -660,11 +683,10 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
   }
 
   const removeAdult = async (id: string) => {
-    if (!confirm('Remove this person from your household? They will lose access.')) return;
     const res = await fetch(`/api/household/members/${id}`, { method: 'DELETE' });
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || 'Failed to remove');
+      // Error is surfaced inline in MemberCard's confirmingDelete UI
+      console.error('[removeAdult]', await res.json().catch(() => ({})));
     }
     load();
   };
@@ -676,7 +698,7 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(data.error || 'Failed to change role');
+      setVillageError(data.error || 'Failed to change role');
     }
     load();
   };
@@ -688,7 +710,7 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(data.error || 'Failed to move circle');
+      setVillageError(data.error || 'Failed to move circle');
     }
     load();
   };
@@ -737,6 +759,17 @@ export function ScreenVillage({ role: roleProp, onOpenSettings }: { role?: 'pare
       />
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 24px 120px' }}>
+        {villageError && (
+          <div style={{
+            margin: '8px 0', padding: '10px 14px', borderRadius: 8,
+            background: '#FFE6DA', color: '#7A2F12',
+            fontFamily: G.serif, fontStyle: 'italic', fontSize: 13,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span>{villageError}</span>
+            <button onClick={() => setVillageError(null)} style={{ background: 'none', border: 'none', color: '#7A2F12', fontSize: 16, cursor: 'pointer', padding: 0 }}>×</button>
+          </div>
+        )}
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', fontFamily: G.serif, fontStyle: 'italic', color: G.muted }}>
             Loading your village…

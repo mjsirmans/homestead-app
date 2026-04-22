@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel } from './shared';
 import { HouseholdSwitcher } from './HouseholdSwitcher';
+import { shortName } from '@/lib/format';
 
 type ShiftRow = {
   shift: {
@@ -49,13 +50,15 @@ function dollars(cents: number | null) {
   return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}/hr`;
 }
 
-function ShiftCard({ row, onClaim, onUnclaim, first, busy, mine }: {
+function ShiftCard({ row, onClaim, onUnclaim, first, busy, mine, confirmingUnclaim, onCancelUnclaim }: {
   row: ShiftRow;
   onClaim: (id: string) => void;
   onUnclaim?: (id: string) => void;
   first?: boolean;
   busy?: boolean;
   mine?: boolean;
+  confirmingUnclaim?: boolean;
+  onCancelUnclaim?: () => void;
 }) {
   const s = new Date(row.shift.startsAt);
   const month = s.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
@@ -103,17 +106,40 @@ function ShiftCard({ row, onClaim, onUnclaim, first, busy, mine }: {
           <span style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>{durationH(row.shift.startsAt, row.shift.endsAt)}</span>
         </div>
         {mine && onUnclaim ? (
-          <button
-            onClick={() => onUnclaim(row.shift.id)}
-            disabled={busy}
-            style={{
-              padding: '7px 14px',
-              background: 'transparent', color: G.ink,
-              border: `1px solid ${G.hairline2}`, borderRadius: 100,
-              fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.4,
-              textTransform: 'uppercase', cursor: busy ? 'wait' : 'pointer',
-              opacity: busy ? 0.7 : 1,
-            }}>{busy ? 'Releasing…' : 'Release'}</button>
+          confirmingUnclaim ? (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => onUnclaim(row.shift.id)}
+                style={{
+                  padding: '7px 12px',
+                  background: G.ink, color: '#FBF7F0',
+                  border: 'none', borderRadius: 100,
+                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
+                  textTransform: 'uppercase', cursor: 'pointer',
+                }}>Yes, release</button>
+              <button
+                onClick={onCancelUnclaim}
+                style={{
+                  padding: '7px 12px',
+                  background: 'transparent', color: G.muted,
+                  border: `1px solid ${G.hairline2}`, borderRadius: 100,
+                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
+                  textTransform: 'uppercase', cursor: 'pointer',
+                }}>Keep</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onUnclaim(row.shift.id)}
+              disabled={busy}
+              style={{
+                padding: '7px 14px',
+                background: 'transparent', color: G.ink,
+                border: `1px solid ${G.hairline2}`, borderRadius: 100,
+                fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.4,
+                textTransform: 'uppercase', cursor: busy ? 'wait' : 'pointer',
+                opacity: busy ? 0.7 : 1,
+              }}>{busy ? 'Releasing…' : 'Release'}</button>
+          )
         ) : (
           <button
             onClick={() => onClaim(row.shift.id)}
@@ -137,6 +163,7 @@ export function ScreenShifts() {
   const [myRows, setMyRows] = useState<ShiftRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmUnclaimId, setConfirmUnclaimId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -145,6 +172,11 @@ export function ScreenShifts() {
         fetch('/api/shifts?scope=village'),
         fetch('/api/shifts?scope=mine'),
       ]);
+      // 401 = not signed in, 409 = no household yet — both are valid empty states
+      if (villageRes.status === 401 || villageRes.status === 409) {
+        setRows([]);
+        return;
+      }
       if (!villageRes.ok) throw new Error(`Failed (${villageRes.status})`);
       const village = await villageRes.json() as ApiResponse;
       setRows(village.shifts);
@@ -180,7 +212,12 @@ export function ScreenShifts() {
   }
 
   async function unclaim(id: string) {
-    if (!confirm('Release this shift back to the village?')) return;
+    // iOS PWA silently blocks confirm() — use inline confirmation instead
+    if (confirmUnclaimId !== id) {
+      setConfirmUnclaimId(id);
+      return;
+    }
+    setConfirmUnclaimId(null);
     setBusyId(id);
     try {
       const res = await fetch(`/api/shifts/${id}/unclaim`, { method: 'POST' });
@@ -242,6 +279,8 @@ export function ScreenShifts() {
                 onUnclaim={unclaim}
                 mine
                 busy={busyId === r.shift.id}
+                confirmingUnclaim={confirmUnclaimId === r.shift.id}
+                onCancelUnclaim={() => setConfirmUnclaimId(null)}
               />
             ))}
             <div style={{

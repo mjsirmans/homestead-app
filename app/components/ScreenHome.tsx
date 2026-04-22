@@ -64,6 +64,7 @@ function StatusCard({ row, accent, tagline, onCancel, onClaim, cancelling, claim
   onClaim?: (id: string) => void; claiming?: boolean;
   showHousehold?: boolean;
 }) {
+  const [confirmingCancel, setConfirmingCancel] = React.useState(false);
   return (
     <div style={{
       background: G.paper, border: `1px solid ${G.hairline2}`,
@@ -99,18 +100,37 @@ function StatusCard({ row, accent, tagline, onCancel, onClaim, cancelling, claim
       {(onCancel || onClaim) && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
           {onCancel && (
-            <button
-              onClick={() => {
-                if (confirm('Cancel this shift? Your village will see it disappear.')) onCancel(row.shift.id);
-              }}
-              disabled={cancelling}
-              style={{
-                padding: '6px 12px', background: 'transparent',
-                border: `1px solid ${G.hairline2}`, borderRadius: 6, color: G.muted,
-                fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.4,
-                textTransform: 'uppercase', cursor: cancelling ? 'wait' : 'pointer',
-              }}
-            >{cancelling ? 'Cancelling…' : 'Cancel'}</button>
+            confirmingCancel ? (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => { setConfirmingCancel(false); onCancel(row.shift.id); }}
+                  style={{
+                    padding: '6px 12px', background: G.ink, color: '#FBF7F0',
+                    border: 'none', borderRadius: 6,
+                    fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
+                    textTransform: 'uppercase', cursor: 'pointer',
+                  }}>Yes, cancel</button>
+                <button
+                  onClick={() => setConfirmingCancel(false)}
+                  style={{
+                    padding: '6px 12px', background: 'transparent', color: G.muted,
+                    border: `1px solid ${G.hairline2}`, borderRadius: 6,
+                    fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
+                    textTransform: 'uppercase', cursor: 'pointer',
+                  }}>Keep</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingCancel(true)}
+                disabled={cancelling}
+                style={{
+                  padding: '6px 12px', background: 'transparent',
+                  border: `1px solid ${G.hairline2}`, borderRadius: 6, color: G.muted,
+                  fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.4,
+                  textTransform: 'uppercase', cursor: cancelling ? 'wait' : 'pointer',
+                }}
+              >{cancelling ? 'Cancelling…' : 'Cancel'}</button>
+            )
           )}
           {onClaim && (
             <button
