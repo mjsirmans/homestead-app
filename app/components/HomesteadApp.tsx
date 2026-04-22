@@ -227,11 +227,11 @@ export function HomesteadApp() {
 
   // Which tab pill to highlight. Non-nav screens (bell, settings) map to a neighbor.
   type NavTab = 'almanac' | 'post' | 'village' | 'shifts';
-  const activeTab: NavTab = screen === 'bell' ? 'almanac' : screen === 'settings' ? 'village' : screen;
+  const activeTab: NavTab = screen === 'bell' ? (role === 'caregiver' ? 'almanac' : 'almanac') : screen === 'settings' ? 'village' : screen as NavTab;
 
   useEffect(() => {
     const parentMap:    TabId[] = ['almanac', 'post',   'village'];
-    const caregiverMap: TabId[] = ['almanac', 'village'];
+    const caregiverMap: TabId[] = ['almanac', 'shifts', 'village'];
     const map = role === 'caregiver' ? caregiverMap : parentMap;
     const handler = (e: KeyboardEvent) => {
       const n = parseInt(e.key);
@@ -307,7 +307,7 @@ export function HomesteadApp() {
         <div style={{ fontFamily: G.sans, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: '#FBF7F0', opacity: 0.5, marginBottom: 8 }}>Shortcuts</div>
         {(role === 'parent'
           ? [['1', 'Almanac'], ['2', 'Post'], ['3', 'Village']]
-          : [['1', 'Schedule'], ['2', 'Village']]
+          : [['1', 'Open'], ['2', 'Schedule'], ['3', 'Village']]
         ).map(([k, l]) => (
           <div key={k} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
             <div style={{

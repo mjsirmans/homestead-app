@@ -213,7 +213,7 @@ function BellCompose({ onRing, onBack, onPost }: {
         right="Ring the bell"
         title="Bell Tower"
         titleColor={RED}
-        tagline="Something came up — we'll reach the inner circle first, the village if no one answers."
+        tagline="Something came up — we'll reach the inner circle first, then widen if no one answers."
         folioLeft="No. 142" folioRight="Urgent edition"
       />
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 24px 120px' }}>
@@ -307,7 +307,6 @@ function BellCompose({ onRing, onBack, onPost }: {
             <div><b style={{ fontFamily: G.sans, fontStyle: 'normal', fontSize: 11, fontWeight: 700, color: RED, letterSpacing: 1 }}>NOW</b> &nbsp; inner circle</div>
             <div><b style={{ fontFamily: G.sans, fontStyle: 'normal', fontSize: 11, fontWeight: 700, color: G.ink2, letterSpacing: 1 }}>+2 MIN</b> &nbsp; family & close friends</div>
             <div><b style={{ fontFamily: G.sans, fontStyle: 'normal', fontSize: 11, fontWeight: 700, color: G.ink2, letterSpacing: 1 }}>+5 MIN</b> &nbsp; trusted sitters</div>
-            <div><b style={{ fontFamily: G.sans, fontStyle: 'normal', fontSize: 11, fontWeight: 700, color: G.ink2, letterSpacing: 1 }}>+10 MIN</b> &nbsp; the whole village</div>
           </div>
         </div>
 
@@ -454,7 +453,6 @@ function BellRinging({ onBack, bellId, reason }: { onBack?: () => void; bellId?:
                 people={family.map(m => ({ name: shortName(m.name), state: 'queued', sub: 'standing by' }))} />
               <Rung ring={3} label="Trusted sitters" status={sitter.length > 0 ? 'queued' : 'pending'} time="+5 min"
                 people={sitter.map(m => ({ name: shortName(m.name), state: 'queued', sub: 'standing by' }))} />
-              <Rung ring={4} label="Whole village" status="pending" time="+10 min · last resort" people={[]} />
             </div>
           </>
         )}

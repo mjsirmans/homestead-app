@@ -50,14 +50,56 @@ function dollars(cents: number | null) {
   return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}/hr`;
 }
 
-function ShiftCard({ row, onClaim, onUnclaim, first, busy, mine, confirmingUnclaim, onCancelUnclaim }: {
+function ReleaseForm({ onConfirm, onCancel, busy }: {
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+  busy: boolean;
+}) {
+  const [reason, setReason] = React.useState('');
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted, marginBottom: 6 }}>
+        Why can't you make it? The parent will be notified.
+      </div>
+      <textarea
+        value={reason}
+        onChange={e => setReason(e.target.value)}
+        placeholder="e.g. Something came up at work…"
+        rows={2}
+        style={{
+          width: '100%', padding: '8px 10px', marginBottom: 8,
+          background: G.bg, border: `1px solid ${G.hairline2}`, borderRadius: 8,
+          fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.ink,
+          resize: 'none', outline: 'none', boxSizing: 'border-box',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button onClick={onCancel} style={{
+          padding: '7px 12px', background: 'transparent', color: G.muted,
+          border: `1px solid ${G.hairline2}`, borderRadius: 100,
+          fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
+          textTransform: 'uppercase', cursor: 'pointer',
+        }}>Keep</button>
+        <button onClick={() => onConfirm(reason)} disabled={busy} style={{
+          padding: '7px 12px', background: G.ink, color: '#FBF7F0',
+          border: 'none', borderRadius: 100,
+          fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
+          textTransform: 'uppercase', cursor: busy ? 'wait' : 'pointer',
+          opacity: busy ? 0.7 : 1,
+        }}>{busy ? 'Releasing…' : 'Yes, release'}</button>
+      </div>
+    </div>
+  );
+}
+
+function ShiftCard({ row, onClaim, onUnclaim, first, busy, mine, releasingUnclaim, onCancelUnclaim }: {
   row: ShiftRow;
   onClaim: (id: string) => void;
-  onUnclaim?: (id: string) => void;
+  onUnclaim?: (id: string, reason: string) => void;
   first?: boolean;
   busy?: boolean;
   mine?: boolean;
-  confirmingUnclaim?: boolean;
+  releasingUnclaim?: boolean;
   onCancelUnclaim?: () => void;
 }) {
   const s = new Date(row.shift.startsAt);
@@ -106,30 +148,15 @@ function ShiftCard({ row, onClaim, onUnclaim, first, busy, mine, confirmingUncla
           <span style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>{durationH(row.shift.startsAt, row.shift.endsAt)}</span>
         </div>
         {mine && onUnclaim ? (
-          confirmingUnclaim ? (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={() => onUnclaim(row.shift.id)}
-                style={{
-                  padding: '7px 12px',
-                  background: G.ink, color: '#FBF7F0',
-                  border: 'none', borderRadius: 100,
-                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
-                  textTransform: 'uppercase', cursor: 'pointer',
-                }}>Yes, release</button>
-              <button
-                onClick={onCancelUnclaim}
-                style={{
-                  padding: '7px 12px',
-                  background: 'transparent', color: G.muted,
-                  border: `1px solid ${G.hairline2}`, borderRadius: 100,
-                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
-                  textTransform: 'uppercase', cursor: 'pointer',
-                }}>Keep</button>
-            </div>
+          releasingUnclaim ? (
+            <ReleaseForm
+              onConfirm={(reason) => onUnclaim(row.shift.id, reason)}
+              onCancel={onCancelUnclaim!}
+              busy={!!busy}
+            />
           ) : (
             <button
-              onClick={() => onUnclaim(row.shift.id)}
+              onClick={() => onUnclaim(row.shift.id, '')}
               disabled={busy}
               style={{
                 padding: '7px 14px',
@@ -163,7 +190,7 @@ export function ScreenShifts() {
   const [myRows, setMyRows] = useState<ShiftRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [confirmUnclaimId, setConfirmUnclaimId] = useState<string | null>(null);
+  const [releasingId, setReleasingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -211,20 +238,25 @@ export function ScreenShifts() {
     }
   }
 
-  async function unclaim(id: string) {
-    // iOS PWA silently blocks confirm() — use inline confirmation instead
-    if (confirmUnclaimId !== id) {
-      setConfirmUnclaimId(id);
+  async function unclaim(id: string, reason: string) {
+    // First tap (empty reason string) → show the release form
+    if (!releasingId) {
+      setReleasingId(id);
       return;
     }
-    setConfirmUnclaimId(null);
+    // Second tap (from ReleaseForm confirm) → actually release
     setBusyId(id);
     try {
-      const res = await fetch(`/api/shifts/${id}/unclaim`, { method: 'POST' });
+      const res = await fetch(`/api/shifts/${id}/unclaim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() || null }),
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'unclaim failed');
       }
+      setReleasingId(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'unclaim failed');
@@ -279,8 +311,8 @@ export function ScreenShifts() {
                 onUnclaim={unclaim}
                 mine
                 busy={busyId === r.shift.id}
-                confirmingUnclaim={confirmUnclaimId === r.shift.id}
-                onCancelUnclaim={() => setConfirmUnclaimId(null)}
+                releasingUnclaim={releasingId === r.shift.id}
+                onCancelUnclaim={() => setReleasingId(null)}
               />
             ))}
             <div style={{

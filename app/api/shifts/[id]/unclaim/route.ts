@@ -4,11 +4,16 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { shifts, users } from '@/lib/db/schema';
 import { apiError } from '@/lib/api-error';
-export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+import { pushToUser } from '@/lib/push';
+
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'unauth' }, { status: 401 });
+
+    const body = await req.json().catch(() => ({})) as { reason?: string };
+    const reason = body.reason?.trim() || null;
 
     const [shift] = await db.select().from(shifts).where(eq(shifts.id, id)).limit(1);
     if (!shift) return NextResponse.json({ error: 'not found' }, { status: 404 });
@@ -26,6 +31,16 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
       .where(and(eq(shifts.id, id), eq(shifts.status, 'claimed')))
       .returning();
     if (!released) return NextResponse.json({ error: 'race lost' }, { status: 409 });
+
+    // Notify the parent who posted the shift
+    pushToUser(shift.createdByUserId, {
+      title: '⚠️ Shift released',
+      body: reason
+        ? `${claimer.name} can no longer cover "${shift.title}": ${reason}`
+        : `${claimer.name} released "${shift.title}" — it's open again.`,
+      url: '/',
+      tag: `unclaim-${id}`,
+    }).catch(() => {});
 
     return NextResponse.json({ shift: released });
   } catch (err) {
