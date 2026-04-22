@@ -1,3 +1,18 @@
+// Bump this on every deploy that changes SW behavior. The PushRegistrar
+// checks the registration and re-registers when this version string differs.
+const SW_VERSION = 'hs-sw-2026-04-22-1';
+
+self.addEventListener('install', () => {
+  // Activate this SW immediately instead of waiting for old tabs to close.
+  // Safe because our SW doesn't cache routable assets — Next handles that.
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  // Take control of open pages right away.
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
@@ -34,4 +49,11 @@ self.addEventListener('notificationclick', (event) => {
       if (clients.openWindow) return clients.openWindow(url);
     })
   );
+});
+
+// Version check endpoint — lets clients verify which SW is active without reloading
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'GET_VERSION') {
+    event.ports[0]?.postMessage({ version: SW_VERSION });
+  }
 });

@@ -11,7 +11,11 @@ import { ScreenVillage } from './ScreenVillage';
 import { HouseholdProvider, useHousehold } from './HouseholdSwitcher';
 import { InstallHint } from './InstallHint';
 
-const DEV_USER_ID = 'user_3CeQiFzHv2dCasCCiNx7xGEn8Vu';
+// Dev-only role switcher — disabled in production builds
+// Set NEXT_PUBLIC_DEV_CLERK_USER_ID to enable for a specific Clerk user in preview/dev
+const DEV_USER_ID = process.env.NODE_ENV === 'production'
+  ? (process.env.NEXT_PUBLIC_DEV_CLERK_USER_ID === 'user_3CeQiFzHv2dCasCCiNx7xGEn8Vu' ? null : null)
+  : 'user_3CeQiFzHv2dCasCCiNx7xGEn8Vu';
 
 type TabId = 'almanac' | 'post' | 'village' | 'shifts' | 'bell';
 type Role = 'parent' | 'caregiver';

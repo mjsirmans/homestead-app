@@ -120,6 +120,12 @@ export async function POST(req: NextRequest) {
     if (user.role !== 'parent') {
       return NextResponse.json({ error: 'Only parents can post shifts' }, { status: 403 });
     }
+
+    // Rate limit: 20 shifts per hour per user (generous — covers recurring batches)
+    const { rateLimit, rateLimitResponse } = await import('@/lib/ratelimit');
+    const rl = rateLimit({ key: `shift-post:${user.id}`, limit: 20, windowMs: 60 * 60_000 });
+    const limited = rateLimitResponse(rl);
+    if (limited) return limited;
     const body = await req.json() as {
       title?: string;
       forWhom?: string;

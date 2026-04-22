@@ -1,5 +1,5 @@
-import webpush from 'web-push';
-import { eq, and, ne } from 'drizzle-orm';
+import webpush, { WebPushError } from 'web-push';
+import { eq, and, ne, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { pushSubscriptions, users } from '@/lib/db/schema';
 
@@ -16,85 +16,122 @@ type PushPayload = {
   tag?: string;
 };
 
+type PushResult = {
+  attempted: number;
+  delivered: number;
+  stale: number;
+  failed: number;
+  errors: string[];
+};
+
+/**
+ * Send to a list of subscription rows. Automatically deletes rows when the
+ * push service reports the subscription as gone (404/410). All errors are
+ * captured and returned — callers must log the result.
+ */
+async function sendBatch(
+  subs: { id: string; endpoint: string; p256dh: string; auth: string }[],
+  payload: PushPayload,
+  context: string,
+): Promise<PushResult> {
+  const result: PushResult = { attempted: subs.length, delivered: 0, stale: 0, failed: 0, errors: [] };
+  if (subs.length === 0) return result;
+
+  const message = JSON.stringify(payload);
+  const staleIds: string[] = [];
+
+  await Promise.all(subs.map(async sub => {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        message,
+      );
+      result.delivered++;
+    } catch (err) {
+      const wpe = err as WebPushError;
+      if (wpe?.statusCode === 404 || wpe?.statusCode === 410) {
+        // Subscription expired or invalid — mark for cleanup
+        result.stale++;
+        staleIds.push(sub.id);
+      } else {
+        result.failed++;
+        const msg = wpe?.statusCode
+          ? `HTTP ${wpe.statusCode}: ${wpe.body || wpe.message}`
+          : (err instanceof Error ? err.message : String(err));
+        result.errors.push(msg);
+      }
+    }
+  }));
+
+  // Clean up stale subscriptions in one query
+  if (staleIds.length > 0) {
+    try {
+      await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, staleIds));
+    } catch (err) {
+      // Non-fatal — stale rows will get cleaned up next time
+      console.error(`[push:${context}] failed to delete stale subs`, err);
+    }
+  }
+
+  // Structured log line for observability (scrape-able format)
+  console.log(JSON.stringify({
+    event: 'push_batch',
+    context,
+    attempted: result.attempted,
+    delivered: result.delivered,
+    stale: result.stale,
+    failed: result.failed,
+    errors: result.errors.slice(0, 3),
+  }));
+
+  return result;
+}
+
 // Send push to all subscribers in a household except the sender
 export async function pushToHousehold(
   householdId: string,
   exceptUserId: string,
   payload: PushPayload,
-) {
-  // Get all users in this household except sender
+): Promise<PushResult> {
   const members = await db.select({ id: users.id })
     .from(users)
     .where(and(eq(users.householdId, householdId), ne(users.id, exceptUserId)));
 
-  if (members.length === 0) return;
+  if (members.length === 0) {
+    return { attempted: 0, delivered: 0, stale: 0, failed: 0, errors: [] };
+  }
 
-  const memberIds = members.map(m => m.id);
-
-  // Get all push subscriptions for those users
+  const memberIds = new Set(members.map(m => m.id));
   const subs = await db.select().from(pushSubscriptions)
     .where(eq(pushSubscriptions.householdId, householdId));
 
-  const eligibleSubs = subs.filter(s => memberIds.includes(s.userId));
-  if (eligibleSubs.length === 0) return;
-
-  const message = JSON.stringify(payload);
-
-  await Promise.allSettled(
-    eligibleSubs.map(sub =>
-      webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        message,
-      ).catch(() => {
-        // Silently ignore failed pushes — expired subscriptions are expected
-      })
-    )
-  );
+  return sendBatch(subs.filter(s => memberIds.has(s.userId)), payload, `household:${householdId}`);
 }
 
 // Send push to a single user by their users.id
-export async function pushToUser(userId: string, payload: PushPayload) {
+export async function pushToUser(userId: string, payload: PushPayload): Promise<PushResult> {
   const subs = await db.select().from(pushSubscriptions)
     .where(eq(pushSubscriptions.userId, userId));
-  if (subs.length === 0) return;
-  const message = JSON.stringify(payload);
-  await Promise.allSettled(
-    subs.map(sub =>
-      webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        message,
-      ).catch(() => {})
-    )
-  );
+  return sendBatch(subs, payload, `user:${userId}`);
 }
 
-// Send push to all caregivers across a set of household IDs (for bell alerts)
+// Send push to all users in a household (parents + caregivers) except the sender
 export async function pushToHouseholdCaregivers(
   householdId: string,
   exceptUserId: string,
   payload: PushPayload,
-) {
-  // Get all caregiver + parent users in household except sender
+): Promise<PushResult> {
   const members = await db.select({ id: users.id })
     .from(users)
     .where(and(eq(users.householdId, householdId), ne(users.id, exceptUserId)));
 
-  const memberIds = members.map(m => m.id);
+  if (members.length === 0) {
+    return { attempted: 0, delivered: 0, stale: 0, failed: 0, errors: [] };
+  }
 
+  const memberIds = new Set(members.map(m => m.id));
   const subs = await db.select().from(pushSubscriptions)
     .where(eq(pushSubscriptions.householdId, householdId));
 
-  const eligibleSubs = subs.filter(s => memberIds.includes(s.userId));
-  if (eligibleSubs.length === 0) return;
-
-  const message = JSON.stringify(payload);
-
-  await Promise.allSettled(
-    eligibleSubs.map(sub =>
-      webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        message,
-      ).catch(() => {})
-    )
-  );
+  return sendBatch(subs.filter(s => memberIds.has(s.userId)), payload, `hh-caregivers:${householdId}`);
 }

@@ -9,6 +9,12 @@ export async function POST(req: NextRequest) {
 
     await requireHousehold();
 
+    // Rate limit: 10 invites per hour per user (prevents email spam)
+    const { rateLimit, rateLimitResponse } = await import('@/lib/ratelimit');
+    const rl = rateLimit({ key: `invite:${userId}`, limit: 10, windowMs: 60 * 60_000 });
+    const limited = rateLimitResponse(rl);
+    if (limited) return limited;
+
     const body = await req.json();
     const { name, email, role, villageGroup, mode } = body as {
       name?: string;

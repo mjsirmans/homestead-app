@@ -3,10 +3,18 @@ import { eq, and, desc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { bells } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
+import { rateLimit, rateLimitResponse } from '@/lib/ratelimit';
 
 export async function POST(req: NextRequest) {
   try {
     const { household, user } = await requireHousehold();
+
+    // Rate limit: max 3 bells per user per 5 minutes. Bell spam alerts every
+    // phone in the village — this is the highest-impact endpoint to protect.
+    const rl = rateLimit({ key: `bell:${user.id}`, limit: 3, windowMs: 5 * 60_000 });
+    const limited = rateLimitResponse(rl);
+    if (limited) return limited;
+
     const body = await req.json();
     const { reason, note, startsAt, endsAt } = body as {
       reason: string;

@@ -4,10 +4,17 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users, kids } from '@/lib/db/schema';
 import { requireHousehold } from '@/lib/auth/household';
+import { stripExif } from '@/lib/strip-exif';
 
 export async function POST(req: NextRequest) {
   try {
     const { household, user } = await requireHousehold();
+
+    // Rate limit: 30 uploads per hour per user
+    const { rateLimit, rateLimitResponse } = await import('@/lib/ratelimit');
+    const rl = rateLimit({ key: `upload:${user.id}`, limit: 30, windowMs: 60 * 60_000 });
+    const limited = rateLimitResponse(rl);
+    if (limited) return limited;
 
     const form = await req.formData();
     const file = form.get('file') as File | null;
@@ -27,8 +34,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Max file size is 5 MB' }, { status: 400 });
     }
 
+    // Read bytes and strip EXIF/GPS for JPEG (privacy-critical for child photos)
+    const rawBuf = Buffer.from(await file.arrayBuffer());
+    const cleanBuf = stripExif(rawBuf, ext);
+
     const pathname = `homestead/${household.id}/${targetType}-${targetId}.${ext}`;
-    const { url } = await put(pathname, file, { access: 'public', addRandomSuffix: false });
+    const { url } = await put(pathname, cleanBuf, { access: 'public', addRandomSuffix: false, contentType: file.type });
 
     if (targetType === 'user') {
       await db.update(users)
