@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq, gte, desc, asc, inArray, or } from 'drizzle-orm';
+import { and, eq, gte, desc, asc, inArray, or, isNull } from 'drizzle-orm';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { shifts, users, households } from '@/lib/db/schema';
@@ -33,10 +33,25 @@ export async function GET(req: NextRequest) {
     let where;
     if (scope === 'village') {
       if (!hhIds.length) return NextResponse.json({ shifts: [], meClerkUserId: userId });
+      // Show all non-cancelled upcoming shifts visible to this caregiver:
+      // - Open shifts not targeted at someone else (null preferred OR targeted at me)
+      // - Claimed shifts (so they know coverage), always visible
+      const myUserIdForFilter = myUserIds[0] ?? null;
       where = and(
         inArray(shifts.householdId, hhIds),
-        eq(shifts.status, 'open'),
         gte(shifts.endsAt, new Date()),
+        or(
+          // Claimed shifts always show
+          eq(shifts.status, 'claimed'),
+          // Open shifts: show if no preference, or preference is this caregiver
+          and(
+            eq(shifts.status, 'open'),
+            or(
+              isNull(shifts.preferredCaregiverId),
+              ...(myUserIdForFilter ? [eq(shifts.preferredCaregiverId, myUserIdForFilter)] : []),
+            ),
+          ),
+        ),
       );
     } else if (scope === 'mine') {
       if (!myUserIds.length) return NextResponse.json({ shifts: [], meClerkUserId: userId });
@@ -89,6 +104,7 @@ export async function GET(req: NextRequest) {
       ...r,
       claimedByMe: r.shift.claimedByUserId ? myUserIdSet.has(r.shift.claimedByUserId) : false,
       createdByMe: myUserIdSet.has(r.shift.createdByUserId),
+      requestedForMe: r.shift.preferredCaregiverId ? myUserIdSet.has(r.shift.preferredCaregiverId) : false,
     }));
 
     return NextResponse.json({ shifts: enriched, meClerkUserId: userId });
@@ -133,6 +149,7 @@ export async function POST(req: NextRequest) {
       startsAt: starts,
       endsAt: ends,
       rateCents: body.rateCents ?? null,
+      preferredCaregiverId: body.preferredCaregiverId ?? null,
     }).returning();
 
     // Fire-and-forget notification (targeted if preferredCaregiverId set)

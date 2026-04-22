@@ -23,8 +23,12 @@ export async function GET(req: NextRequest) {
         db.select().from(kids).where(inArray(kids.householdId, hhIds)),
       ]);
 
-      const normaliseName = (n: string) =>
-        n.includes('@') ? n.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : n;
+      const normaliseName = (n: string) => {
+        if (n.includes('@')) return n.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        if (!n.includes(' ') && /[._]/.test(n)) return n.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        if (!n.includes(' ') && n === n.toLowerCase()) return n.charAt(0).toUpperCase() + n.slice(1);
+        return n;
+      };
 
       const families = hhRows.map(h => ({
         household: { id: h.id, name: h.name, glyph: h.glyph },
@@ -41,10 +45,13 @@ export async function GET(req: NextRequest) {
       db.select().from(kids).where(eq(kids.householdId, household.id)),
     ]);
 
-    const normalised = adults.map(a => ({
-      ...a,
-      name: a.name.includes('@') ? a.name.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : a.name,
-    }));
+    const normName = (n: string) => {
+      if (n.includes('@')) return n.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      if (!n.includes(' ') && /[._]/.test(n)) return n.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      if (!n.includes(' ') && n === n.toLowerCase()) return n.charAt(0).toUpperCase() + n.slice(1);
+      return n;
+    };
+    const normalised = adults.map(a => ({ ...a, name: normName(a.name) }));
     return NextResponse.json({ adults: normalised, kids: kidsList });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

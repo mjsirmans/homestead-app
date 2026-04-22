@@ -45,6 +45,7 @@ export const shifts = pgTable('shifts', {
   householdId: uuid('household_id').notNull().references(() => households.id, { onDelete: 'cascade' }),
   createdByUserId: uuid('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
   claimedByUserId: uuid('claimed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  preferredCaregiverId: uuid('preferred_caregiver_id').references(() => users.id, { onDelete: 'set null' }),
   title: text('title').notNull(),
   forWhom: text('for_whom'),
   notes: text('notes'),

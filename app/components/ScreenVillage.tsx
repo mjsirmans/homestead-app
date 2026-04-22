@@ -59,12 +59,19 @@ function shortName(full: string): string {
   // If the stored name looks like an email, use the local part before @
   if (trimmed.includes('@')) {
     const local = trimmed.split('@')[0];
-    // Capitalise first letter of each segment split by . or _
     return local.split(/[._]/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
   }
+  // If it looks like a slug/username (no spaces, contains dots/underscores, or all lowercase with no spaces)
+  if (!trimmed.includes(' ') && /[._]/.test(trimmed)) {
+    return trimmed.split(/[._]/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+  }
   const parts = trimmed.split(/\s+/);
-  if (parts.length === 1) return parts[0];
-  const first = parts[0];
+  if (parts.length === 1) {
+    // Single token — title-case it if it's all lowercase (likely a username)
+    if (trimmed === trimmed.toLowerCase()) return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    return trimmed;
+  }
+  const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
   const lastInitial = parts[parts.length - 1][0]?.toUpperCase();
   return lastInitial ? `${first} ${lastInitial}.` : first;
 }

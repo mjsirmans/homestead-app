@@ -23,11 +23,13 @@ type ShiftRow = {
     status: 'open' | 'claimed' | 'cancelled' | 'done';
     householdId: string;
     claimedByUserId: string | null;
+    preferredCaregiverId: string | null;
   };
   household: { id: string; name: string; glyph: string } | null;
   creator: { id: string; name: string } | null;
   claimedByMe?: boolean;
   createdByMe?: boolean;
+  requestedForMe?: boolean;
 };
 
 function fmtTimeRange(startIso: string, endIso: string) {
@@ -94,6 +96,14 @@ function ShiftCard({ row, accent, tagline, onCancel, onClaim, cancelling, claimi
       }} />
       {showHousehold && row.household && (
         <HouseholdChip name={row.household.name} glyph={row.household.glyph} />
+      )}
+      {row.requestedForMe && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 6,
+          padding: '2px 8px', borderRadius: 100,
+          background: G.clay, color: '#FBF7F0',
+          fontFamily: G.sans, fontSize: 8, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase',
+        }}>★ Requested for you</div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
@@ -330,10 +340,15 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
   const [openRow, setOpenRow] = useState<ShiftRow | null>(null);
   const [unavailability, setUnavailability] = useState<UnavailRow[]>([]);
   const [showUnavailForm, setShowUnavailForm] = useState(false);
-  const [unavailStart, setUnavailStart] = useState('');
-  const [unavailEnd, setUnavailEnd] = useState('');
+  const [unavailDate, setUnavailDate] = useState('');
+  const [unavailStartTime, setUnavailStartTime] = useState('09:00');
+  const [unavailEndDate, setUnavailEndDate] = useState('');
+  const [unavailEndTime, setUnavailEndTime] = useState('17:00');
   const [unavailNote, setUnavailNote] = useState('');
   const [savingUnavail, setSavingUnavail] = useState(false);
+  // derived for API
+  const unavailStart = unavailDate ? `${unavailDate}T${unavailStartTime}` : '';
+  const unavailEnd = unavailEndDate ? `${unavailEndDate}T${unavailEndTime}` : '';
 
   const load = useCallback(async () => {
     setError(null);
@@ -376,7 +391,9 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
       });
       if (res.ok) {
         setShowUnavailForm(false);
-        setUnavailStart(''); setUnavailEnd(''); setUnavailNote('');
+        setUnavailDate(''); setUnavailStartTime('09:00');
+        setUnavailEndDate(''); setUnavailEndTime('17:00');
+        setUnavailNote('');
         await loadUnavail();
       }
     } finally {
@@ -655,17 +672,28 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
                 padding: 14, borderRadius: 8, border: `1px solid ${G.hairline2}`,
                 background: G.paper, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10,
               }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label>
-                    <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, marginBottom: 4 }}>From</div>
-                    <input type="datetime-local" value={unavailStart} onChange={e => setUnavailStart(e.target.value)}
-                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 12, color: G.ink, outline: 'none' }} />
-                  </label>
-                  <label>
-                    <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, marginBottom: 4 }}>Until</div>
-                    <input type="datetime-local" value={unavailEnd} onChange={e => setUnavailEnd(e.target.value)}
-                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 12, color: G.ink, outline: 'none' }} />
-                  </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, marginBottom: 6 }}>From</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                      <input type="date" value={unavailDate} onChange={e => {
+                        setUnavailDate(e.target.value);
+                        if (!unavailEndDate) setUnavailEndDate(e.target.value);
+                      }}
+                        style={{ padding: '10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 14, color: G.ink, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+                      <input type="time" value={unavailStartTime} onChange={e => setUnavailStartTime(e.target.value)}
+                        style={{ padding: '10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 14, color: G.ink, outline: 'none', width: 100 }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, marginBottom: 6 }}>Until</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                      <input type="date" value={unavailEndDate} onChange={e => setUnavailEndDate(e.target.value)}
+                        style={{ padding: '10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 14, color: G.ink, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+                      <input type="time" value={unavailEndTime} onChange={e => setUnavailEndTime(e.target.value)}
+                        style={{ padding: '10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 14, color: G.ink, outline: 'none', width: 100 }} />
+                    </div>
+                  </div>
                 </div>
                 <input value={unavailNote} onChange={e => setUnavailNote(e.target.value)}
                   placeholder="Optional note (vacation, work trip…)"
