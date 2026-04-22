@@ -23,9 +23,12 @@ export async function GET(req: NextRequest) {
         db.select().from(kids).where(inArray(kids.householdId, hhIds)),
       ]);
 
+      const normaliseName = (n: string) =>
+        n.includes('@') ? n.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : n;
+
       const families = hhRows.map(h => ({
         household: { id: h.id, name: h.name, glyph: h.glyph },
-        adults: allAdults.filter(a => a.householdId === h.id),
+        adults: allAdults.filter(a => a.householdId === h.id).map(a => ({ ...a, name: normaliseName(a.name) })),
         kids: allKids.filter(k => k.householdId === h.id),
       }));
 

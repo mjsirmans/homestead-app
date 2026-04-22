@@ -505,7 +505,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
               tagline={r.shift.status === 'claimed' ? 'Covered' : 'Open · needs someone'}
               onCancel={role === 'parent' && r.createdByMe ? cancelShift : undefined}
               cancelling={cancellingId === r.shift.id}
-              onClaim={r.shift.status === 'open' && !r.createdByMe ? claimShift : undefined}
+              onClaim={r.shift.status === 'open' && (role === 'caregiver' || !r.createdByMe) ? claimShift : undefined}
               claiming={claimingId === r.shift.id}
               showHousehold={multiHousehold}
               onOpen={setOpenRow}
@@ -522,7 +522,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
               tagline={r.shift.status === 'claimed' ? 'Covered' : 'Open · needs someone'}
               onCancel={role === 'parent' && r.createdByMe ? cancelShift : undefined}
               cancelling={cancellingId === r.shift.id}
-              onClaim={r.shift.status === 'open' && !r.createdByMe ? claimShift : undefined}
+              onClaim={r.shift.status === 'open' && (role === 'caregiver' || !r.createdByMe) ? claimShift : undefined}
               claiming={claimingId === r.shift.id}
               showHousehold={multiHousehold}
               onOpen={setOpenRow}
@@ -559,7 +559,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
                       tagline={r.shift.status === 'claimed' ? 'Covered' : 'Open · needs someone'}
                       onCancel={role === 'parent' && r.createdByMe ? cancelShift : undefined}
                       cancelling={cancellingId === r.shift.id}
-                      onClaim={r.shift.status === 'open' && !r.createdByMe ? claimShift : undefined}
+                      onClaim={r.shift.status === 'open' && (role === 'caregiver' || !r.createdByMe) ? claimShift : undefined}
                       claiming={claimingId === r.shift.id}
                       showHousehold={multiHousehold}
                       onOpen={setOpenRow}
@@ -580,7 +580,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
               tagline={r.shift.status === 'claimed' ? 'Covered' : 'Open · needs someone'}
               onCancel={role === 'parent' && r.createdByMe ? cancelShift : undefined}
               cancelling={cancellingId === r.shift.id}
-              onClaim={r.shift.status === 'open' && !r.createdByMe ? claimShift : undefined}
+              onClaim={r.shift.status === 'open' && (role === 'caregiver' || !r.createdByMe) ? claimShift : undefined}
               claiming={claimingId === r.shift.id}
               showHousehold={multiHousehold}
               onOpen={setOpenRow}
@@ -655,16 +655,16 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
                 padding: 14, borderRadius: 8, border: `1px solid ${G.hairline2}`,
                 background: G.paper, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10,
               }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <label>
                     <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, marginBottom: 4 }}>From</div>
                     <input type="datetime-local" value={unavailStart} onChange={e => setUnavailStart(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 13, color: G.ink, outline: 'none' }} />
+                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 12, color: G.ink, outline: 'none' }} />
                   </label>
                   <label>
                     <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, marginBottom: 4 }}>Until</div>
                     <input type="datetime-local" value={unavailEnd} onChange={e => setUnavailEnd(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 13, color: G.ink, outline: 'none' }} />
+                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 12, color: G.ink, outline: 'none' }} />
                   </label>
                 </div>
                 <input value={unavailNote} onChange={e => setUnavailNote(e.target.value)}
@@ -720,7 +720,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
             setOpenRow(null);
           }}
           claiming={claimingId === openRow.shift.id}
-          canClaim={openRow.shift.status === 'open' && !openRow.createdByMe}
+          canClaim={openRow.shift.status === 'open' && (role === 'caregiver' || !openRow.createdByMe)}
         />
       )}
     </div>

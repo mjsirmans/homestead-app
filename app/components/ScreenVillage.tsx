@@ -336,7 +336,7 @@ function InviteSheet({ onClose, onInvited, caregiverMode }: { onClose: () => voi
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(27,23,19,0.5)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000,
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1200,
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         background: G.bg, width: '100%', maxWidth: 480,
@@ -879,7 +879,7 @@ export function ScreenVillage({ role: roleProp }: { role?: 'parent' | 'caregiver
       {renaming && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(27,23,19,0.5)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1200,
         }} onClick={() => setRenaming(false)}>
           <div onClick={e => e.stopPropagation()} style={{
             background: G.bg, width: '100%', maxWidth: 480,
