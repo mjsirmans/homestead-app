@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs';
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
 // Bump this in lockstep with SW_VERSION in public/sw.js. When they differ, the
 // client forces an SW update so users don't get stuck on stale caches.
-const EXPECTED_SW_VERSION = 'hs-sw-2026-04-22-1';
+const EXPECTED_SW_VERSION = 'hs-sw-2026-04-22-2';
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);

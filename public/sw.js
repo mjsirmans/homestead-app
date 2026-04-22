@@ -1,6 +1,6 @@
 // Bump this on every deploy that changes SW behavior. The PushRegistrar
 // checks the registration and re-registers when this version string differs.
-const SW_VERSION = 'hs-sw-2026-04-22-1';
+const SW_VERSION = 'hs-sw-2026-04-22-2';
 
 self.addEventListener('install', () => {
   // Activate this SW immediately instead of waiting for old tabs to close.
@@ -26,8 +26,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Homestead';
   const options = {
     body: payload.body || '',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/icon-192',
+    badge: '/icon-192',
     tag: payload.tag || 'homestead',
     data: { url: payload.url || '/' },
     requireInteraction: payload.urgent === true,
