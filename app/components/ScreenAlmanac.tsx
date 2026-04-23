@@ -473,6 +473,8 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [openRow, setOpenRow] = useState<ShiftRow | null>(null);
   const [villageSize, setVillageSize] = useState(0);
+  const [activeBell, setActiveBell] = useState<{ id: string; reason: string } | null>(null);
+  const [cancellingBell, setCancellingBell] = useState(false);
   const [unavailability, setUnavailability] = useState<UnavailRow[]>([]);
   const [showUnavailForm, setShowUnavailForm] = useState(false);
   const [unavailDate, setUnavailDate] = useState('');
@@ -491,9 +493,10 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
     try {
       // Dual-role and multi-household users always get the unified scope
       const scope = (isDualRole || multiHousehold) ? 'all' : role === 'caregiver' ? 'village' : 'household';
-      const [shiftsRes, villageRes] = await Promise.all([
+      const [shiftsRes, villageRes, bellRes] = await Promise.all([
         fetch(`/api/shifts?scope=${scope}`),
         role === 'parent' ? fetch('/api/village') : Promise.resolve(null),
+        role === 'parent' ? fetch('/api/bell/active') : Promise.resolve(null),
       ]);
       if (shiftsRes.status === 409 || shiftsRes.status === 401) {
         // No active household yet (Clerk still hydrating, or user has no household).
@@ -507,6 +510,11 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
       if (villageRes?.ok) {
         const v = await villageRes.json();
         setVillageSize((v.adults?.length ?? 0) + (v.kids?.length ?? 0));
+      }
+      if (bellRes?.ok) {
+        const bd = await bellRes.json();
+        const ringing = (bd.bells || []).find((b: { status: string; id: string; reason: string }) => b.status === 'ringing');
+        setActiveBell(ringing ? { id: ringing.id, reason: ringing.reason } : null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
@@ -659,6 +667,52 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
       />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 24px 120px' }}>
+        {/* Active bell banner — parent only */}
+        {role === 'parent' && activeBell && (
+          <div style={{
+            margin: '10px 0 4px', padding: '12px 14px', borderRadius: 10,
+            background: '#FFF0E8', border: `1.5px solid #B5342B`,
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{ fontSize: 20, flexShrink: 0 }}>🔔</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: '#B5342B', marginBottom: 2 }}>Bell ringing</div>
+              <div style={{ fontFamily: G.display, fontSize: 14, fontWeight: 500, color: G.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeBell.reason}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button onClick={onRing} style={{
+                padding: '6px 10px', borderRadius: 6,
+                background: '#B5342B', color: '#FBF7F0', border: 'none',
+                fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                textTransform: 'uppercase', cursor: 'pointer',
+              }}>View</button>
+              <button
+                disabled={cancellingBell}
+                onClick={async () => {
+                  if (cancellingBell) return;
+                  setCancellingBell(true);
+                  try {
+                    const res = await fetch(`/api/bell/${activeBell.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: 'cancelled' }),
+                    });
+                    if (res.ok) setActiveBell(null);
+                  } finally {
+                    setCancellingBell(false);
+                  }
+                }}
+                style={{
+                  padding: '6px 10px', borderRadius: 6,
+                  background: 'transparent', color: '#B5342B',
+                  border: `1px solid #B5342B`,
+                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                  textTransform: 'uppercase', cursor: cancellingBell ? 'wait' : 'pointer',
+                  opacity: cancellingBell ? 0.6 : 1,
+                }}>{cancellingBell ? '…' : 'Cancel'}</button>
+            </div>
+          </div>
+        )}
         {error && (
           <div style={{
             marginTop: 10, padding: '10px 12px', borderRadius: 8,
