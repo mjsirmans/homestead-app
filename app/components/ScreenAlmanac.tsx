@@ -458,10 +458,11 @@ function BellButton({ onRing }: { onRing: () => void }) {
   );
 }
 
-export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onPost, onVillage }: {
+export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onViewBell, onPost, onVillage }: {
   role?: 'parent' | 'caregiver';
   isDualRole?: boolean;
-  onRing?: () => void;
+  onRing?: () => void;      // compose mode — new bell
+  onViewBell?: () => void;  // status mode — view existing active bell
   onPost?: () => void;
   onVillage?: () => void;
 }) {
@@ -680,7 +681,7 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onP
               <div style={{ fontFamily: G.display, fontSize: 14, fontWeight: 500, color: G.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeBell.reason}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              <button onClick={onRing} style={{
+              <button onClick={onViewBell ?? onRing} style={{
                 padding: '6px 10px', borderRadius: 6,
                 background: '#B5342B', color: '#FBF7F0', border: 'none',
                 fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,

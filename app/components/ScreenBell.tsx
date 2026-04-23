@@ -558,8 +558,11 @@ function BellIncoming() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
+    const interval = setInterval(load, 8_000);
+    // Re-poll immediately when the tab regains focus (user comes back from another app)
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    return () => { clearInterval(interval); window.removeEventListener('focus', onFocus); };
   }, [load]);
 
   async function respond(bellId: string, response: 'on_my_way' | 'in_thirty' | 'cannot') {
