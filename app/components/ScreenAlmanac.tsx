@@ -44,6 +44,9 @@ function durationH(startIso: string, endIso: string) {
   const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
   return `${(ms / 3600000).toFixed(ms % 3600000 === 0 ? 0 : 1)}h`;
 }
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
 function bucketOf(iso: string): 'today' | 'tomorrow' | 'week' | 'later' {
   const d = new Date(iso);
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -118,6 +121,9 @@ function ShiftCard({ row, accent, tagline, onCancel, onClaim, cancelling, claimi
             {fmtTimeRange(row.shift.startsAt, row.shift.endsAt)}
             {row.shift.forWhom && <> · For {row.shift.forWhom}</>}
           </div>
+          <div style={{ fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 11, marginTop: 2 }}>
+            {fmtDate(row.shift.startsAt)}
+          </div>
           {row.shift.notes && (
             <div style={{ fontFamily: G.serif, fontSize: 13, color: G.ink2, marginTop: 6, lineHeight: 1.4 }}>
               {row.shift.notes}
@@ -125,7 +131,10 @@ function ShiftCard({ row, accent, tagline, onCancel, onClaim, cancelling, claimi
           )}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontFamily: G.display, fontSize: 22, color: accent }}>{durationH(row.shift.startsAt, row.shift.endsAt)}</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+            <div style={{ fontFamily: G.display, fontSize: 22, color: accent }}>{durationH(row.shift.startsAt, row.shift.endsAt)}</div>
+            <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 0.5, color: accent, opacity: 0.7 }}>hrs</div>
+          </div>
           {rate && (
             <div style={{ fontFamily: G.sans, fontSize: 11, fontWeight: 700, letterSpacing: 1, color: G.ink, marginTop: 2 }}>
               {rate}
@@ -141,16 +150,16 @@ function ShiftCard({ row, accent, tagline, onCancel, onClaim, cancelling, claimi
                 <button
                   onClick={(e) => { e.stopPropagation(); setConfirmingCancel(false); onCancel(row.shift.id); }}
                   style={{
-                    padding: '6px 12px', background: G.ink, color: '#FBF7F0',
-                    border: 'none', borderRadius: 6,
+                    padding: '9px 16px', background: G.ink, color: '#FBF7F0',
+                    border: 'none', borderRadius: 8,
                     fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
                     textTransform: 'uppercase', cursor: 'pointer',
                   }}>Yes, cancel</button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setConfirmingCancel(false); }}
                   style={{
-                    padding: '6px 12px', background: 'transparent', color: G.muted,
-                    border: `1px solid ${G.hairline2}`, borderRadius: 6,
+                    padding: '9px 14px', background: 'transparent', color: G.muted,
+                    border: `1px solid ${G.hairline2}`, borderRadius: 8,
                     fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
                     textTransform: 'uppercase', cursor: 'pointer',
                   }}>Keep</button>
@@ -194,6 +203,7 @@ function ShiftDetailSheet({ row, onClose, onClaim, claiming, canClaim }: {
   const rate = fmtRate(row.shift.rateCents);
   const d = new Date(row.shift.startsAt);
   const dateLabel = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const touchStartY = React.useRef(0);
   return (
     <div
       onClick={onClose}
@@ -204,12 +214,15 @@ function ShiftDetailSheet({ row, onClose, onClaim, claiming, canClaim }: {
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => { touchStartY.current = e.touches[0].clientY; }}
+        onTouchEnd={(e) => { if (e.changedTouches[0].clientY - touchStartY.current > 80) onClose(); }}
         style={{
           width: '100%', maxWidth: 480, background: G.bg,
           borderRadius: '16px 16px 0 0', padding: '20px 20px 32px',
           maxHeight: '85vh', overflowY: 'auto',
         }}
       >
+        <div style={{ width: 36, height: 4, background: G.hairline2, borderRadius: 4, margin: '0 auto 16px' }} />
         {row.household && (
           <HouseholdChip name={row.household.name} glyph={row.household.glyph} />
         )}
@@ -414,9 +427,13 @@ function EmptyAlmanac({ onRing, onPost, onVillage, role, villageSize }: {
         title="Post your first need"
         sub="Pick a date, a time, and who it's for. Invite your village first so they get notified."
         action={
-          <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>
-            Invite someone first, then post a need.
-          </div>
+          <button onClick={onVillage} style={{
+            padding: '8px 16px',
+            background: G.ink, color: '#FBF7F0',
+            border: 'none', borderRadius: 6,
+            fontFamily: G.sans, fontSize: 10, fontWeight: 700, letterSpacing: 1.4,
+            textTransform: 'uppercase', cursor: 'pointer',
+          }}>Go to Village →</button>
         }
       />
     </div>

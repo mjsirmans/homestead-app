@@ -181,7 +181,7 @@ export function GTabBar({ active = 'almanac', onNavigate, role = 'parent', bellC
   const caregiverTabs: Tab[] = [
     { id: 'almanac', label: 'Open',     icon: Icons.almanac },
     { id: 'shifts',  label: 'Schedule', icon: Icons.shifts },
-    { id: 'bell',    label: 'Bell',     icon: Icons.bell, badge: bellCount > 0 ? bellCount : undefined },
+    { id: 'bell',    label: 'Alerts',   icon: Icons.bell, badge: bellCount > 0 ? bellCount : undefined },
     { id: 'village', label: 'Village',  icon: Icons.village },
   ];
   const tabs = role === 'caregiver' ? caregiverTabs : parentTabs;

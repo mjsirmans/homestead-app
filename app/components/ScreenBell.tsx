@@ -209,7 +209,7 @@ function BellCompose({ onRing, onBack, onPost }: {
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: BELL_BG, color: G.ink }}>
       <GMasthead
         leftAction={
-          <button onClick={onBack} style={{ fontFamily: G.display, fontSize: 26, color: G.ink, lineHeight: 1, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>×</button>
+          <button onClick={onBack} style={{ fontFamily: G.sans, fontSize: 15, fontWeight: 700, letterSpacing: 0.5, color: G.ink, lineHeight: 1, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>‹ Back</button>
         }
         right="Ring the bell"
         title="Bell Tower"
@@ -328,7 +328,7 @@ function BellCompose({ onRing, onBack, onPost }: {
           textTransform: 'uppercase', cursor: why === null || submitting ? 'default' : 'pointer',
           boxShadow: why === null || submitting ? 'none' : `0 4px 0 ${RED_DARK}`,
           transition: 'background 0.15s, color 0.15s',
-        }}>{submitting ? 'Ringing…' : 'Ring the Bell'}</button>
+        }}>{submitting ? 'Ringing…' : why === null ? 'Select a reason above' : 'Ring the Bell'}</button>
 
         <div style={{ marginTop: 12, textAlign: 'center', fontFamily: G.serif, fontStyle: 'italic', fontSize: 12, color: G.muted }}>
           Not urgent?{' '}
@@ -457,7 +457,7 @@ function BellRinging({ onBack, bellId, reason }: { onBack?: () => void; bellId?:
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: BELL_BG, color: G.ink }}>
       <GMasthead
         leftAction={onBack ? (
-          <button onClick={onBack} style={{ fontFamily: G.display, fontSize: 26, color: G.ink, lineHeight: 1, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>×</button>
+          <button onClick={onBack} style={{ fontFamily: G.sans, fontSize: 15, fontWeight: 700, letterSpacing: 0.5, color: G.ink, lineHeight: 1, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>‹ Back</button>
         ) : undefined}
         right="Urgent"
         title={reason || 'Bell ringing'}
@@ -590,12 +590,13 @@ function BellIncoming() {
           left="Bell" right="Incoming"
           title="All clear"
           titleColor={G.ink}
-          tagline="No bells ringing right now. You'll see alerts here when a family needs help."
+          tagline="You'll be notified instantly when a family needs help. Stand by."
           folioLeft="No alerts" folioRight="Standing by"
         />
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px 120px' }}>
           <PushPermissionBanner />
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 40 }}>
+            <div style={{ fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.ink2, textAlign: 'center', lineHeight: 1.5, marginBottom: 16 }}>The bell is how families in your village ask for urgent help.</div>
             <BellGlyph size={48} />
             <div style={{ marginTop: 16, fontFamily: G.serif, fontStyle: 'italic', fontSize: 14, color: G.muted, lineHeight: 1.6, textAlign: 'center' }}>
               When someone rings the bell,<br />it will appear here.
@@ -668,7 +669,7 @@ function BellIncoming() {
                       fontFamily: G.sans, fontSize: 11, fontWeight: 700, letterSpacing: 1.5,
                       textTransform: 'uppercase', cursor: 'pointer',
                       opacity: responding ? 0.7 : 1,
-                    }}>Could in 30 min</button>
+                    }}>Available in 30 min</button>
                   <button
                     onClick={() => respond(bell.id, 'cannot')}
                     disabled={responding !== null}
