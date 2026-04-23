@@ -4,6 +4,7 @@ import { G } from './tokens';
 import { GMasthead, GLabel } from './shared';
 import { useHousehold } from './HouseholdSwitcher';
 import { shortName } from '@/lib/format';
+import { WhenPickerWindow, WhenPickerDate, shiftWindowPresets, datePresets } from './WhenPicker';
 
 type Kid = { id: string; name: string };
 type Caregiver = { id: string; name: string; role: string };
@@ -270,32 +271,14 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
 
         <div style={{ marginTop: 22 }}>
           <GLabel>When</GLabel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-            <Pill label="Starts">
-              <input
-                type="datetime-local"
-                value={startsAt}
-                min={minNow}
-                onChange={e => {
-                  setStartsAt(e.target.value);
-                  // If the current end is before or equal to the new start, bump it by 1 hour
-                  if (e.target.value && endsAt <= e.target.value) {
-                    const newStart = new Date(e.target.value);
-                    setEndsAt(toLocalInputValue(new Date(newStart.getTime() + 60 * 60 * 1000)));
-                  }
-                }}
-                style={pillInput}
-              />
-            </Pill>
-            <Pill label="Ends">
-              <input
-                type="datetime-local"
-                value={endsAt}
-                min={startsAt || minNow}
-                onChange={e => setEndsAt(e.target.value)}
-                style={pillInput}
-              />
-            </Pill>
+          <div style={{ marginTop: 8 }}>
+            <WhenPickerWindow
+              startValue={startsAt}
+              endValue={endsAt}
+              onChange={(s, e) => { setStartsAt(s); setEndsAt(e); }}
+              presets={shiftWindowPresets}
+              minNow={minNow}
+            />
           </div>
         </div>
 
@@ -355,12 +338,14 @@ export function ScreenPost({ onCancel, onPost, onRing }: {
                   </div>
                 )}
                 {recurEnds === 'date' && (
-                  <input
-                    type="date" value={recurEndDate}
-                    min={new Date().toISOString().slice(0, 10)}
-                    onChange={e => setRecurEndDate(e.target.value)}
-                    style={{ ...selectStyle, marginTop: 10 }}
-                  />
+                  <div style={{ marginTop: 10 }}>
+                    <WhenPickerDate
+                      value={recurEndDate}
+                      onChange={setRecurEndDate}
+                      presets={datePresets}
+                      minDate={new Date().toISOString().slice(0, 10)}
+                    />
+                  </div>
                 )}
               </div>
             </div>

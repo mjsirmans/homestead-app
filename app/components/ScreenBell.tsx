@@ -4,6 +4,7 @@ import { G, RED, RED_DARK, BELL_BG } from './tokens';
 import { GMasthead, GLabel, GAvatar } from './shared';
 import { requestPushPermission } from './PushRegistrar';
 import { shortName } from '@/lib/format';
+import { WhenPickerWindow, bellWindowPresets } from './WhenPicker';
 
 function BellPill({ label, value, emphasized }: { label: string; value: string; emphasized?: boolean }) {
   return (
@@ -261,46 +262,15 @@ function BellCompose({ onRing, onBack, onPost }: {
 
         <div style={{ marginTop: 22 }}>
           <GLabel>When</GLabel>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-            <label style={{ minWidth: 0, overflow: 'hidden' }}>
-              <div style={{ fontFamily: G.sans, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase', color: RED, fontWeight: 700, marginBottom: 4 }}>Start</div>
-              <input
-                type="datetime-local"
-                value={startsAt}
-                min={minNow}
-                onChange={e => {
-                  setStartsAt(e.target.value);
-                  // If the current end is at or before the new start, bump it by 3 hours
-                  if (e.target.value && endsAt <= e.target.value) {
-                    const newStart = new Date(e.target.value);
-                    const pad = (n: number) => String(n).padStart(2, '0');
-                    const bumped = new Date(newStart.getTime() + 3 * 3600000);
-                    setEndsAt(`${bumped.getFullYear()}-${pad(bumped.getMonth()+1)}-${pad(bumped.getDate())}T${pad(bumped.getHours())}:${pad(bumped.getMinutes())}`);
-                  }
-                }}
-                style={{
-                  display: 'block', width: '100%', padding: '8px 6px', borderRadius: 8, boxSizing: 'border-box',
-                  border: `1px solid ${RED}`, background: '#FFE6DA',
-                  fontFamily: G.display, fontSize: 11, color: G.ink, outline: 'none',
-                  minWidth: 0,
-                }}
-              />
-            </label>
-            <label style={{ minWidth: 0, overflow: 'hidden' }}>
-              <div style={{ fontFamily: G.sans, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, fontWeight: 700, marginBottom: 4 }}>Until</div>
-              <input
-                type="datetime-local"
-                value={endsAt}
-                min={startsAt || minNow}
-                onChange={e => setEndsAt(e.target.value)}
-                style={{
-                  display: 'block', width: '100%', padding: '8px 6px', borderRadius: 8, boxSizing: 'border-box',
-                  border: `1px solid ${G.hairline2}`, background: G.paper,
-                  fontFamily: G.display, fontSize: 11, color: G.ink, outline: 'none',
-                  minWidth: 0,
-                }}
-              />
-            </label>
+          <div style={{ marginTop: 8 }}>
+            <WhenPickerWindow
+              startValue={startsAt}
+              endValue={endsAt}
+              onChange={(s, e) => { setStartsAt(s); setEndsAt(e); }}
+              presets={bellWindowPresets}
+              accent={RED}
+              minNow={minNow}
+            />
           </div>
         </div>
 

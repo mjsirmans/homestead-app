@@ -4,6 +4,7 @@ import { G } from './tokens';
 import { GMasthead, GLabel, SectionHead, Icons } from './shared';
 import { HouseholdSwitcher, useHousehold } from './HouseholdSwitcher';
 import { shortName } from '@/lib/format';
+import { WhenPickerDateRange, unavailRangePresets } from './WhenPicker';
 
 type UnavailRow = {
   id: string;
@@ -939,33 +940,19 @@ export function ScreenAlmanac({ role = 'parent', isDualRole = false, onRing, onV
                 padding: 14, borderRadius: 8, border: `1px solid ${G.hairline2}`,
                 background: G.paper, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10,
               }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div>
-                    <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, marginBottom: 6 }}>From</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
-                      <input type="date" value={unavailDate}
-                        min={new Date().toISOString().slice(0, 10)}
-                        onChange={e => {
-                          setUnavailDate(e.target.value);
-                          if (!unavailEndDate || unavailEndDate < e.target.value) setUnavailEndDate(e.target.value);
-                        }}
-                        style={{ padding: '10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 14, color: G.ink, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
-                      <input type="time" value={unavailStartTime} onChange={e => setUnavailStartTime(e.target.value)}
-                        style={{ padding: '10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 14, color: G.ink, outline: 'none', width: 100 }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: G.muted, marginBottom: 6 }}>Until</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
-                      <input type="date" value={unavailEndDate}
-                        min={unavailDate || new Date().toISOString().slice(0, 10)}
-                        onChange={e => setUnavailEndDate(e.target.value)}
-                        style={{ padding: '10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 14, color: G.ink, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
-                      <input type="time" value={unavailEndTime} onChange={e => setUnavailEndTime(e.target.value)}
-                        style={{ padding: '10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.sans, fontSize: 14, color: G.ink, outline: 'none', width: 100 }} />
-                    </div>
-                  </div>
-                </div>
+                <WhenPickerDateRange
+                  startDate={unavailDate}
+                  endDate={unavailEndDate}
+                  startTime={unavailStartTime}
+                  endTime={unavailEndTime}
+                  onChange={v => {
+                    setUnavailDate(v.startDate);
+                    setUnavailEndDate(v.endDate);
+                    setUnavailStartTime(v.startTime);
+                    setUnavailEndTime(v.endTime);
+                  }}
+                  presets={unavailRangePresets}
+                />
                 <input value={unavailNote} onChange={e => setUnavailNote(e.target.value)}
                   placeholder="Optional note (vacation, work trip…)"
                   style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1px solid ${G.hairline2}`, borderRadius: 6, background: G.bg, fontFamily: G.serif, fontStyle: 'italic', fontSize: 13, color: G.ink, outline: 'none' }} />
