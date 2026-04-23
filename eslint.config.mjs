@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // macOS AppleDouble sidecars on ExFAT volumes — cosmetic noise, not code.
+    "**/._*",
   ]),
 ]);
 
