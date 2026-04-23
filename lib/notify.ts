@@ -105,11 +105,26 @@ export async function notifyShiftClaimed(shiftId: string) {
 
   const [creator] = await db.select().from(users).where(eq(users.id, row.shift.createdByUserId)).limit(1);
   const [claimer] = await db.select().from(users).where(eq(users.id, row.shift.claimedByUserId)).limit(1);
-  if (!creator?.email) return;
+  if (!creator) return;
 
-  const subject = `${claimer?.name || 'Someone'} claimed your shift`;
+  const claimerName = claimer?.name || 'A caregiver';
+  const when = row.shift.startsAt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+  // Push notification to the parent who posted the shift
+  import('@/lib/push').then(({ pushToUser }) =>
+    pushToUser(row.shift.createdByUserId, {
+      title: `✅ ${claimerName} is on it`,
+      body: `"${row.shift.title}" · ${when}`,
+      url: '/?tab=almanac',
+      tag: `claimed-${shiftId}`,
+    })
+  ).catch(() => {});
+
+  if (!creator.email) return;
+
+  const subject = `${claimerName} claimed your shift`;
   const text = [
-    `${claimer?.name || 'A caregiver'} just claimed your shift "${row.shift.title}"`,
+    `${claimerName} just claimed your shift "${row.shift.title}"`,
     `at ${row.household?.name || 'your household'}:`,
     ``,
     `  ${fmt(row.shift.startsAt)} – ${fmt(row.shift.endsAt)}`,

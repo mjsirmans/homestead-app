@@ -272,9 +272,9 @@ export function ScreenShifts() {
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: G.bg, color: G.ink }}>
       <GMasthead
-        leftAction={<HouseholdSwitcher />} right={rows ? `${openRows.length} open` : ''}
+        leftAction={<HouseholdSwitcher />} right={myRows.length > 0 ? `${myRows.length} claimed` : ''}
         title="My Schedule"
-        tagline="Shifts you've claimed. Tap one to view details or release."
+        tagline={myRows.length > 0 ? 'Tap a shift to view details or release it.' : 'Shifts you claim will appear here.'}
         folioRight="The Slate"
       />
 
@@ -291,21 +291,24 @@ export function ScreenShifts() {
             Loading the slate…
           </div>
         )}
-        {rows && openRows.length === 0 && (
+        {rows && myRows.length === 0 && openRows.length === 0 && (
           <div style={{
-            marginTop: 18, padding: '30px 16px', textAlign: 'center',
-            border: `1px dashed ${G.hairline2}`, borderRadius: 8,
-            fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 13,
+            marginTop: 32, padding: '36px 20px', textAlign: 'center',
+            border: `1px dashed ${G.hairline2}`, borderRadius: 12,
+            fontFamily: G.serif, fontStyle: 'italic', color: G.muted, fontSize: 14,
           }}>
-            No open shifts right now. Check back later.
+            Nothing on your schedule yet.
+            <div style={{ marginTop: 8, fontSize: 12 }}>
+              Head to <strong style={{ fontStyle: 'normal' }}>Open Shifts</strong> to find something to claim.
+            </div>
           </div>
         )}
         {myRows.length > 0 && (
           <>
             <div style={{
               fontFamily: G.sans, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase',
-              color: G.ink, fontWeight: 700, margin: '14px 0 6px',
-            }}>Your claimed shifts</div>
+              color: G.ink, fontWeight: 700, margin: '18px 0 8px',
+            }}>Claimed by you</div>
             {myRows.map((r, i) => (
               <ShiftCard
                 key={r.shift.id} row={r} first={i === 0}
@@ -317,10 +320,10 @@ export function ScreenShifts() {
                 onCancelUnclaim={() => setReleasingId(null)}
               />
             ))}
-            <div style={{
+            {openRows.length > 0 && <div style={{
               fontFamily: G.sans, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase',
-              color: G.ink, fontWeight: 700, margin: '22px 0 6px',
-            }}>Open in your villages</div>
+              color: G.ink, fontWeight: 700, margin: '26px 0 8px',
+            }}>Also available</div>}
           </>
         )}
         {openRows.map((r, i) => (
