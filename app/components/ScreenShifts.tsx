@@ -4,6 +4,7 @@ import { G } from './tokens';
 import { GMasthead, GLabel } from './shared';
 import { HouseholdSwitcher } from './HouseholdSwitcher';
 import { shortName } from '@/lib/format';
+import { fmtTimeRange, durationH } from '@/lib/format/time';
 
 type ShiftRow = {
   shift: {
@@ -34,16 +35,6 @@ function fmtWhen(startIso: string) {
   if (days === 1) return 'Tomorrow';
   if (days > 1 && days < 7) return s.toLocaleDateString(undefined, { weekday: 'long' });
   return s.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-}
-function fmtTimeRange(startIso: string, endIso: string) {
-  const s = new Date(startIso);
-  const e = new Date(endIso);
-  const t = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return `${t(s)} – ${t(e)}`;
-}
-function durationH(startIso: string, endIso: string) {
-  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
-  return `${(ms / 3600000).toFixed(ms % 3600000 === 0 ? 0 : 1)}h`;
 }
 function dollars(cents: number | null) {
   if (cents == null) return null;

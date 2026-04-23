@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { G } from './tokens';
 import { GMasthead, GLabel, SectionHead } from './shared';
 import { HouseholdSwitcher, useHousehold } from './HouseholdSwitcher';
+import { fmtTimeRange, durationH } from '@/lib/format/time';
 
 type ShiftRow = {
   shift: {
@@ -23,16 +24,6 @@ type ShiftRow = {
   createdByMe?: boolean;
 };
 
-function fmtTimeRange(startIso: string, endIso: string) {
-  const s = new Date(startIso);
-  const e = new Date(endIso);
-  const t = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return `${t(s)} – ${t(e)}`;
-}
-function durationH(startIso: string, endIso: string) {
-  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
-  return `${(ms / 3600000).toFixed(ms % 3600000 === 0 ? 0 : 1)}h`;
-}
 function bucketOf(iso: string): 'today' | 'tomorrow' | 'week' | 'later' {
   const d = new Date(iso);
   const today = new Date(); today.setHours(0, 0, 0, 0);
