@@ -161,65 +161,69 @@ function MemberCard({ name, role, isMe, appRole, onToggleRole, villageGroup, onC
             {role === 'parent' ? 'parent' : role === 'caregiver' ? 'caregiver' : role}
           </div>
         </div>
-        {villageGroup && onChangeGroup && (
-          <button
-            onClick={() => setPickerOpen(true)}
-            style={{
-              background: G.paper, color: G.ink,
-              border: `1px solid ${G.hairline2}`, borderRadius: 100,
-              padding: '5px 10px', cursor: 'pointer',
-              fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
-              textTransform: 'uppercase', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <span>{GROUP_LABEL[villageGroup]}</span>
-            <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 1v8M1 5l4 4 4-4" />
-            </svg>
-          </button>
-        )}
-        {onToggleRole && appRole && (
-          <button onClick={onToggleRole} title="Toggle role" style={{
-            background: appRole === 'parent' ? G.ink : 'transparent',
-            color: appRole === 'parent' ? '#FBF7F0' : G.ink,
-            border: `1px solid ${G.ink}`, borderRadius: 100,
-            padding: '3px 8px', cursor: 'pointer',
-            fontFamily: G.sans, fontSize: 8, fontWeight: 700, letterSpacing: 1,
-            textTransform: 'uppercase',
-          }}>{appRole === 'parent' ? 'P' : 'C'}</button>
-        )}
-        {onDelete && (
-          confirmingDelete ? (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={() => { setConfirmingDelete(false); onDelete(); }}
-                style={{
-                  padding: '4px 10px', background: G.ink, color: '#FBF7F0',
-                  border: 'none', borderRadius: 100,
-                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,
-                  textTransform: 'uppercase', cursor: 'pointer',
-                }}>Remove</button>
-              <button
-                onClick={() => setConfirmingDelete(false)}
-                style={{
-                  padding: '4px 10px', background: 'transparent', color: G.muted,
-                  border: `1px solid ${G.hairline2}`, borderRadius: 100,
-                  fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,
-                  textTransform: 'uppercase', cursor: 'pointer',
-                }}>Keep</button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmingDelete(true)} aria-label="Remove" style={{
-              background: 'transparent', border: `1px solid ${G.hairline2}`,
-              borderRadius: 6, color: G.muted,
-              fontSize: 16, cursor: 'pointer',
-              minWidth: 44, minHeight: 44, padding: 0, lineHeight: 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}>×</button>
-          )
-        )}
       </div>
+      {(villageGroup && onChangeGroup) || (onToggleRole && appRole) || onDelete ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+          {villageGroup && onChangeGroup && (
+            <button
+              onClick={() => setPickerOpen(true)}
+              style={{
+                background: G.paper, color: G.ink,
+                border: `1px solid ${G.hairline2}`, borderRadius: 100,
+                padding: '5px 10px', cursor: 'pointer',
+                fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
+                textTransform: 'uppercase', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <span>{GROUP_LABEL[villageGroup]}</span>
+              <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 1v8M1 5l4 4 4-4" />
+              </svg>
+            </button>
+          )}
+          {onToggleRole && appRole && (
+            <button onClick={onToggleRole} title="Toggle role" style={{
+              background: appRole === 'parent' ? G.ink : 'transparent',
+              color: appRole === 'parent' ? '#FBF7F0' : G.ink,
+              border: `1px solid ${G.ink}`, borderRadius: 100,
+              padding: '3px 8px', cursor: 'pointer',
+              fontFamily: G.sans, fontSize: 8, fontWeight: 700, letterSpacing: 1,
+              textTransform: 'uppercase',
+            }}>{appRole === 'parent' ? 'P' : 'C'}</button>
+          )}
+          {onDelete && (
+            confirmingDelete ? (
+              <>
+                <button
+                  onClick={() => { setConfirmingDelete(false); onDelete(); }}
+                  style={{
+                    padding: '4px 10px', background: G.ink, color: '#FBF7F0',
+                    border: 'none', borderRadius: 100,
+                    fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                    textTransform: 'uppercase', cursor: 'pointer',
+                  }}>Remove</button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  style={{
+                    padding: '4px 10px', background: 'transparent', color: G.muted,
+                    border: `1px solid ${G.hairline2}`, borderRadius: 100,
+                    fontFamily: G.sans, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                    textTransform: 'uppercase', cursor: 'pointer',
+                  }}>Keep</button>
+              </>
+            ) : (
+              <button onClick={() => setConfirmingDelete(true)} aria-label="Remove" style={{
+                background: 'transparent', border: `1px solid ${G.hairline2}`,
+                borderRadius: 6, color: G.muted,
+                fontSize: 16, cursor: 'pointer',
+                minWidth: 32, minHeight: 32, padding: 0, lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>×</button>
+            )
+          )}
+        </div>
+      ) : null}
       {uploadError && (
         <div style={{
           marginTop: 6, padding: '6px 10px', borderRadius: 6,
